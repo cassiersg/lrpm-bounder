@@ -1,0 +1,13 @@
+C x
+B x y
+P x = x0 + x1 + x2
+P y = y0 + y1 + y2
+L p00 = x0 * y0
+L p01 = x0 * y1
+L p02 = x0 * y2
+L p10 = x1 * y0
+L p11 = x1 * y1
+L p12 = x1 * y2
+L p20 = x2 * y0
+L p21 = x2 * y1
+L p22 = x2 * y2
