@@ -204,7 +204,7 @@ def belief_propagation(
     return info
 
 if __name__ == '__main__':
-    with open('circuit.txt') as f:
+    with open('test_circuit.txt') as f:
         s = f.read()
     g, var_leakage, cont_vars, var_map = build_circuit_model(*parse_circuit_raw(s))
     from pprint import pprint
