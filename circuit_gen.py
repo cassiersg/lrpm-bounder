@@ -149,9 +149,13 @@ def gen_all(d):
     with open(f'circuits-{d}/pini2.txt', 'w') as f:
         f.write(pini2(d))
 
+import sys
 
 if __name__ == '__main__':
-    d = 3
+    try:
+        d = int(sys.argv[1])
+    except IndexError:
+        d = 3
     gen_all(d)
     print(f'---- ISW, d={d} ----')
     print(isw(d))
