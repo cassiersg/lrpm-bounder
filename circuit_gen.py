@@ -66,7 +66,7 @@ def BBP15(d):
 
     return res
 
-def PINI1(d):
+def pini1(d):
     res = mul_preamble(d)
 
     for i in range(d):
@@ -94,7 +94,7 @@ def PINI1(d):
 
     return res
 
-def PINI2(d):
+def pini2(d):
     d2 = d-1
     res = mul_preamble(d)
 
@@ -136,14 +136,29 @@ def PINI2(d):
             res += f'B z_{i} = c_{i}_0\n'
     return res
 
+import os
+
+def gen_all(d):
+    os.makedirs(f'circuits-{d}', exist_ok=True)
+    with open(f'circuits-{d}/isw.txt', 'w') as f:
+        f.write(isw(d))
+    with open(f'circuits-{d}/BBP15.txt', 'w') as f:
+        f.write(BBP15(d))
+    with open(f'circuits-{d}/pini1.txt', 'w') as f:
+        f.write(pini1(d))
+    with open(f'circuits-{d}/pini2.txt', 'w') as f:
+        f.write(pini2(d))
+
+
 if __name__ == '__main__':
     d = 3
+    gen_all(d)
     print(f'---- ISW, d={d} ----')
     print(isw(d))
     print(f'---- BBP15, d={d} ----')
     print(BBP15(d))
-    print(f'---- PINI1, d={d} ----')
-    print(PINI1(d))
-    print(f'---- PINI2, d={d} ----')
-    print(PINI2(d))
+    print(f'---- pini1, d={d} ----')
+    print(pini1(d))
+    print(f'---- pini2, d={d} ----')
+    print(pini2(d))
 
