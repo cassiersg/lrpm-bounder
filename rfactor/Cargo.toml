@@ -1,0 +1,7 @@
+[package]
+name = "rfactor"
+version = "0.1.0"
+authors = ["Gaëtan Cassiers <gaetan.cassiers@gmail.com>"]
+
+[dependencies]
+structopt = "0.2"

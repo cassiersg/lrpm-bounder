@@ -39,10 +39,14 @@ def parse_circuit_raw(circuit):
         elif kind in ('P', 'L'):
             assign = st[2:].strip()
             dest, calc = map(str.strip, assign.split('='))
-            op_kind = ''.join(set(c for c in calc if c in ('*', '+')))
-            assert op_kind in ('*', '+'), f'Invalid operation at line {i+1}: invalid opeator set: {op_kind}'
+            op_kind = ''.join(set(c for c in calc if not (c.isalnum() or c.isspace() or c == '_')))
             ops = tuple(map(str.strip, calc.replace('*', '+').split('+')))
-            {'L': leaking_ops, 'P': properties}[kind].add((op_kind, dest, ops))
+            if op_kind == '':
+                # kind '[PL] X = Y' -> 'L' is meaningless -> always P -> equivalent to B
+                bijections.add((dest, ops[0]))
+            else:
+                assert op_kind in ('', '*', '+'), f'Invalid operation at line {i+1}: invalid opeator set: {op_kind}'
+                {'L': leaking_ops, 'P': properties}[kind].add((op_kind, dest, ops))
         else:
             assert False, f'Invalid statement kind "{kind}" for statement ar line {i+1}'
     return cont_vars, bijections, leaking_ops, properties
@@ -83,7 +87,7 @@ def canonicalize_vars(bijections, cont_vars, leaking_ops, properties):
 def compute_var_leakage(variables, leaking_ops):
     all_ops = collections.Counter(list_ops(leaking_ops))
     all_dest = collections.Counter(list_dest(leaking_ops))
-    return {f'v_{var}': all_ops[var] + all_dest[var] for var in variables}
+    return {var: all_ops[var] + all_dest[var] for var in variables}
 
 def build_graph(equalities):
     variables = list_vars(equalities)
@@ -98,22 +102,35 @@ def build_graph(equalities):
 
 def test_all_var_in_eq(cont_vars, bijections, equalities):
     variables = list_vars(equalities)
-    for bijection in bijections:
-        for var in bijection:
-            assert var in variables, f'Variable "{var}" in bijection "{bijection}" unused'
-    for var in cont_vars:
-        assert var in variables, f'Continuous leakage variable "{var}" unused'
 
-def build_circuit_model(cont_vars, bijections, leaking_ops, properties):
+def simplify_circuit_model(cont_vars, bijections, leaking_ops, properties):
     test_all_var_in_eq(cont_vars, bijections, leaking_ops | properties)
     var_map, cont_vars, leaking_ops, properties = canonicalize_vars(
             bijections, cont_vars, leaking_ops, properties)
     equalities = leaking_ops | properties
     variables = list_vars(equalities)
     var_leakage = compute_var_leakage(variables, leaking_ops)
+    return equalities, var_leakage, cont_vars, var_map
+
+def build_circuit_model(cont_vars, bijections, leaking_ops, properties):
+    equalities, var_leakage, cont_vars, var_map = simplify_circuit_model(
+            cont_vars, bijections, leaking_ops, properties)
+    var_leakage = {f'v_{var}': v for var, v in var_leakage.items()}
     g = build_graph(equalities)
     cont_vars = {f'v_{var}' for var in cont_vars}
     return g, var_leakage, cont_vars, var_map
+
+def export_circuit_model(cont_vars, bijections, leaking_ops, properties):
+    equalities, var_leakage, cont_vars, _ = simplify_circuit_model(
+            cont_vars, bijections, leaking_ops, properties)
+    res = ''
+    for op_kind, dest, ops in equalities:
+        res += f'E {op_kind} {dest} {" ".join(ops)}\n'
+    for var, leakage in var_leakage.items():
+        res += f'L {var} {leakage}\n'
+    for var in cont_vars:
+        res += f'C {var}\n'
+    return res
 
 def init_belief_propagation(g, var_leakage):
     return {src: {dest: 0 for dest in g.nodes} for src in g.nodes}
@@ -142,14 +159,14 @@ def belief_propagation_edge(g,
                 messages[src2][src] * (own_coef if src2 == dest else default_coef)
                 for src2 in g.neighbors(src)
                 )
-        return intrinsic_leakage + extrinsic_leakage
+        return min(1, intrinsic_leakage + extrinsic_leakage)
     else:
         loss = (alpha if g.nodes[src]['kind'] == '+' else beta)
         loss = loss**(g.degree(src) - 2)
-        return loss * prod(
+        return min(1, loss * prod(
             messages[src2][src] for src2 in g.neighbors(src)
             if src2 != dest
-            )
+            ))
 
 def belief_propagation_iter(g, var_leakage, cont_vars, messages, N, alpha, beta):
     return {src:
@@ -185,7 +202,7 @@ def belief_propagation(
         alpha=1,
         beta=1,
         rtol=0.001,
-        max_iter=1000,
+        max_iter=256,
         ):
     var_leakage = {n: l*leakage_mi for n, l in var_leakage.items()}
     messages_old = init_belief_propagation(g, var_leakage)
@@ -194,27 +211,38 @@ def belief_propagation(
             g, var_leakage, cont_vars, messages_old, N, alpha, beta)
     while not are_messages_close(messages_old, messages, rtol):
         if n >= max_iter:
-            raise ValueError('Max number of iterations exceeded')
+            print("Max number of iterations exceeded")
+            break
+            #raise ValueError('Max number of iterations exceeded')
         messages_old = messages
         n *= 2
         for _ in range(n):
             messages = belief_propagation_iter(
                     g, var_leakage, cont_vars, messages, N, alpha, beta)
+    print(f'Number of iterations: {2*n}')
     info = belief_propatation_final(g, var_leakage, cont_vars, messages, N)
     return info
 
+import sys
 if __name__ == '__main__':
-    with open('test_circuit.txt') as f:
+    in_fname = sys.argv[1]
+    with open(in_fname) as f:
         s = f.read()
-    g, var_leakage, cont_vars, var_map = build_circuit_model(*parse_circuit_raw(s))
-    from pprint import pprint
-    b = belief_propagation(
-            g, var_leakage,
-            cont_vars,
-            leakage_mi=0.05,
-            N=10,
-            alpha=1,
-            beta=1,
-            )
-    pprint(b)
+    if 0:
+        g, var_leakage, cont_vars, var_map = build_circuit_model(*parse_circuit_raw(s))
+        from pprint import pprint
+        b = belief_propagation(
+                g, var_leakage,
+                cont_vars,
+                leakage_mi=0.01,
+                N=10,
+                alpha=1,
+                beta=1,
+                rtol=0.1,
+                max_iter=100,
+                )
+        pprint(b)
+    elif 1:
+        print(export_circuit_model(*parse_circuit_raw(s)))
+
 
