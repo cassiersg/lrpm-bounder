@@ -70,8 +70,8 @@ def gen_random_inputs(d, domain=(0,1)):
 def assert_sh_prod(x, y, z):
     assert (sum(x) % 2) * (sum(y) % 2) == (sum(z) % 2)
 
-def test_isw(d):
-    c = isw(d)
+def test_mul(d, mul=isw):
+    c = mul(d)
     g = circuit_model.CompGraph(c)
     inputs, x, y  = gen_random_inputs(d)
     res, _ = g.compute(inputs)
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     print(f'---- ISW, d={d} ----')
     print(isw(d))
     for _ in range(100):
-        test_isw(d)
+        test_mul(d, isw)
 
     #print(f'---- BBP15, d={d} ----')
     #print(BBP15(d))
