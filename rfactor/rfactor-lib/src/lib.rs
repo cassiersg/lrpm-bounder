@@ -64,7 +64,7 @@ pub struct FactorGraph<'a> {
 
 #[derive(Debug)]
 pub struct BeliefState<'a: 'b, 'b> {
-    pub mi_vars: Vec<f64>,
+    mi_vars: Vec<f64>,
     mi_edges_to_vars: Vec<Vec<f64>>,
     factor_graph: &'b FactorGraph<'a>,
 }
@@ -207,5 +207,37 @@ impl<'a, 'b> BeliefState<'a, 'b> {
         panic!("Max iteration count exceeded. max_delta: {}\n {:#?}",
                max_delta, &self.mi_vars);
     }
+
+    pub fn extract_mi(&self) -> HashMap<&'a str, f64> {
+        self.factor_graph.names_ids.iter().map(
+            |(k, id)| (*k, self.mi_vars[*id])
+            ).collect()
+    }
+}
+
+pub fn parse_factor(s: &str) -> FactorGraph {
+    let mut graph = FactorGraph::new();
+    for line in s.split('\n').filter(|x| !x.is_empty()) {
+        let chunks: Vec<_> = line.split(' ').filter(|x|  !x.is_empty()).collect();
+        assert!(chunks.len() >= 2);
+        match chunks[0] {
+            "E" => {
+                assert!(chunks.len() >= 4);
+                let opkind = chunks[1].parse().unwrap();
+                graph.insert_op_and_vars(opkind, &chunks[2..]);
+            }
+            "L" => {
+                assert!(chunks.len() == 3);
+                let id = graph.get_var_or_insert(chunks[1]);
+                graph.vars_leakage[id] = chunks[2].parse().unwrap();
+            }
+            "C" => {
+                let id = graph.get_var_or_insert(chunks[1]);
+                graph.vars_cont[id] = true;
+            }
+            _ => panic!("Invalid line {}", line),
+        };
+    }
+    return graph;
 }
 

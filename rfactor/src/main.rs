@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 extern crate rfactor_lib;
 
-use rfactor_lib::FactorGraph;
+use rfactor_lib::parse_factor;
 
 
 #[derive(StructOpt, Debug)]
@@ -44,32 +44,11 @@ fn read_input(path: &Path) -> Result<String, io::Error> {
 fn main() {
     let opt = Opt::from_args();
     let s = read_input(&opt.input).unwrap();
-    let mut graph = FactorGraph::new();
-    for line in s.split('\n').filter(|x| !x.is_empty()) {
-        let chunks: Vec<_> = line.split(' ').filter(|x|  !x.is_empty()).collect();
-        assert!(chunks.len() >= 2);
-        match chunks[0] {
-            "E" => {
-                assert!(chunks.len() >= 4);
-                let opkind = chunks[1].parse().unwrap();
-                graph.insert_op_and_vars(opkind, &chunks[2..]);
-            }
-            "L" => {
-                assert!(chunks.len() == 3);
-                let id = graph.get_var_or_insert(chunks[1]);
-                graph.vars_leakage[id] = chunks[2].parse().unwrap();
-            }
-            "C" => {
-                let id = graph.get_var_or_insert(chunks[1]);
-                graph.vars_cont[id] = true;
-            }
-            _ => panic!("Invalid line {}", line),
-        };
-    }
+    let graph = parse_factor(&s);
     println!("{:#?}", graph);
     let mut bs = graph.new_belief_state();
     let nb_iter = bs.run_belief_propagation(
         opt.leakage, 1.0, 1.0, opt.n, opt.precision, opt.max_iter);
     println!("nb_iter {}", nb_iter);
-    println!("{:#?}", bs.mi_vars);
+    println!("{:#?}", bs.extract_mi());
 }

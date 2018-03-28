@@ -8,4 +8,5 @@ structopt = "0.2"
 rfactor-lib = { path = "rfactor-lib" }
 
 [workspace]
+members = ["rfactor-lib", "rfactor-python"]
 
