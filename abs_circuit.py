@@ -103,12 +103,3 @@ def simplify_circuit_model(cont_vars, bijections, leaking_ops, properties):
     var_leakage = compute_var_leakage(variables, leaking_ops)
     return equalities, var_leakage, cont_vars, var_map
 
-def build_circuit_model(cont_vars, bijections, leaking_ops, properties):
-    equalities, var_leakage, cont_vars, var_map = simplify_circuit_model(
-            cont_vars, bijections, leaking_ops, properties)
-    var_leakage = {f'v_{var}': v for var, v in var_leakage.items()}
-    g = build_graph(equalities)
-    cont_vars = {f'v_{var}' for var in cont_vars}
-    return g, var_leakage, cont_vars, var_map
-
-
