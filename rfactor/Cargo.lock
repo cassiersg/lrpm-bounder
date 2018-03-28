@@ -73,8 +73,13 @@ dependencies = [
 name = "rfactor"
 version = "0.1.0"
 dependencies = [
+ "rfactor-lib 0.1.0",
  "structopt 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "rfactor-lib"
+version = "0.1.0"
 
 [[package]]
 name = "strsim"
