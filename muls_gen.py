@@ -55,6 +55,8 @@ def isw(d):
 
     return c
 
+muls = {'isw': isw}
+
 import sys
 
 def gen_random_input(d, domain=(0,1)):

@@ -18,6 +18,7 @@ Conversion from abstract circuit model to circuit leakage model.
 
 import sys
 import abs_circuit
+import muls_gen
 
 def export_circuit_model(cont_vars, bijections, leaking_ops, properties):
     equalities, var_leakage, cont_vars, _ = abs_circuit.simplify_circuit_model(
@@ -31,17 +32,17 @@ def export_circuit_model(cont_vars, bijections, leaking_ops, properties):
         res += f'C {var}\n'
     return res
 
-def convert(s):
-    return export_circuit_model(*abs_circuit.parse_circuit_raw(s))
+def convert(c):
+    return export_circuit_model(*abs_circuit.circuit2abstract(c))
 
 if __name__ == '__main__':
-    in_fname = sys.argv[1]
-    with open(in_fname) as f:
-        s = f.read()
-    res = convert(s)
-    if len(sys.argv) < 3:
+    mul_kind = sys.argv[1]
+    d = sys.argv[2]
+    c = muls_gen.muls[mul_kind](int(d))
+    res = convert(c)
+    if len(sys.argv) < 4:
         print(res)
     else:
-        with open(sys.argv[2], 'w') as f:
+        with open(sys.argv[3], 'w') as f:
             f.write(res)
 

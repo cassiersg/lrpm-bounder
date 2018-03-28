@@ -20,36 +20,27 @@ import collections
 
 import networkx as nx
 
-def parse_circuit_raw(circuit):
-    statements = (st.strip() for st in circuit.splitlines())
-    cont_vars = set()
-    bijections = set()
-    leaking_ops = set()
-    properties = set()
-    for i, st in enumerate(statements):
-        assert len(st) > 2 and st[1] == ' ', f'Invalid statement "{st}" at line {i+1}'
-        kind = st[0]
-        if kind == 'C':
-            var = st[2:].strip()
-            cont_vars.add(var)
-        elif kind == 'B':
-            bij_vars = filter(bool, map(str.strip, st[2:].strip().split(' ')))
-            bijections.add(tuple(bij_vars))
-        elif kind in ('P', 'L'):
-            assign = st[2:].strip()
-            dest, calc = map(str.strip, assign.split('='))
-            op_kind = ''.join(set(c for c in calc if not (c.isalnum() or c.isspace() or c == '_')))
-            ops = tuple(map(str.strip, calc.replace('*', '+').split('+')))
-            if op_kind == '':
-                # kind '[PL] X = Y' -> 'L' is meaningless -> always P -> equivalent to B
-                bijections.add((dest, ops[0]))
-            else:
-                assert op_kind in ('', '*', '+'), f'Invalid operation at line {i+1}: invalid opeator set: {op_kind}'
-                {'L': leaking_ops, 'P': properties}[kind].add((op_kind, dest, ops))
-        else:
-            assert False, f'Invalid statement kind "{kind}" for statement ar line {i+1}'
+def circuit2abstract(circuit):
+    def fmt_vars(v):
+        return tuple(map(circuit.fmt_var, v))
+    cont_vars = set(circuit.fmt_var(var) for var in circuit.vars if var.continuous)
+    bijections = set(fmt_vars(ops) for ops in circuit.bijs)
+    for dest, ops in circuit.p_prods + circuit.p_sums:
+        if len(ops) == 1:
+            bijections.add((circuit.fmt_var(dest), circuit.fmt_var(ops[0])))
+    leaking_ops = (
+            set(('+', circuit.fmt_var(dest), fmt_vars(ops))
+                for dest, ops in circuit.l_sums) |
+            set(('*', circuit.fmt_var(dest), fmt_vars(ops))
+                for dest, ops in circuit.l_prods)
+            )
+    properties = (
+            set(('+', circuit.fmt_var(dest), fmt_vars(ops))
+                for dest, ops in circuit.p_sums if len(ops) != 1) |
+            set(('*', circuit.fmt_var(dest), fmt_vars(ops))
+                for dest, ops in circuit.p_prods if len(ops) != 1)
+            )
     return cont_vars, bijections, leaking_ops, properties
-
 
 def build_var_map(bijections, variables):
     g = nx.Graph()
