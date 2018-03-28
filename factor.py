@@ -20,15 +20,10 @@ import numpy as np
 import networkx as nx
 
 import abs_circuit
+import utils
 
 def init_belief_propagation(g, var_leakage):
     return {src: {dest: 0 for dest in g.nodes} for src in g.nodes}
-
-def prod(seq, start=1):
-    res = start
-    for x in seq:
-        res *= x
-    return res
 
 def belief_propagation_edge(g,
         var_leakage,
@@ -52,7 +47,7 @@ def belief_propagation_edge(g,
     else:
         loss = (alpha if g.nodes[src]['kind'] == '+' else beta)
         loss = loss**(g.degree(src) - 2)
-        return min(1, loss * prod(
+        return min(1, loss * utils.product(
             messages[src2][src] for src2 in g.neighbors(src)
             if src2 != dest
             ))
