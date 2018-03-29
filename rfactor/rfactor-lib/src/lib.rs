@@ -164,7 +164,7 @@ impl<'a> NamedFactorGraph<'a> {
 }
 impl<'a> BeliefState<'a> {
     fn compute_vars_sums(&mut self, mi_leak: f64, n: u32) -> f64 {
-        let mut max_delta = 0.0;
+        let mut max_rel_delta = 0.0;
         for var in 0..self.factor_graph.vars_cont.len() {
             let intrinsic_leakage =
                 mi_leak * (self.factor_graph.vars_leakage[var] as f64);
@@ -177,10 +177,10 @@ impl<'a> BeliefState<'a> {
                 panic!("old_mi {} new_mi {} var {}", old_mi, new_mi, var);
             }
             self.mi_vars[var] = f64::max(old_mi, new_mi);
-            let delta = (new_mi - old_mi).abs();
-            max_delta = f64::max(max_delta, delta);
+            let rel_delta = (new_mi - old_mi).abs()/new_mi;
+            max_rel_delta = f64::max(max_rel_delta, rel_delta);
         }
-        return max_delta;
+        return max_rel_delta;
     }
 
     fn clip_vars_mi(&mut self) {
@@ -233,17 +233,17 @@ impl<'a> BeliefState<'a> {
         mi_tol: f64,
         max_iter: u32
         ) -> u32 {
-        let mut max_delta = 0.0;
+        let mut max_rel_delta = 0.0;
         for i in 0..max_iter {
-            max_delta = self.compute_vars_sums(mi_leak, n);
-            if max_delta < mi_tol {
+            max_rel_delta = self.compute_vars_sums(mi_leak, n);
+            if max_rel_delta < mi_tol {
                 self.clip_vars_mi();
                 return i;
             }
             self.compute_ops_products(alpha, beta);
         }
-        panic!("Max iteration count exceeded. max_delta: {}\n {:#?}",
-               max_delta, &self.mi_vars);
+        panic!("Max iteration count exceeded. max_rel_delta: {}\n {:#?}",
+               max_rel_delta, &self.mi_vars);
     }
 }
 
