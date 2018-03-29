@@ -45,10 +45,9 @@ fn main() {
     let opt = Opt::from_args();
     let s = read_input(&opt.input).unwrap();
     let graph = parse_factor(&s);
-    println!("{:#?}", graph);
-    let mut bs = graph.new_belief_state();
-    let nb_iter = bs.run_belief_propagation(
+    let (res, nb_iter) = graph.belief_prop(
         opt.leakage, 1.0, 1.0, opt.n, opt.precision, opt.max_iter);
+    println!("{:#?}", graph);
     println!("nb_iter {}", nb_iter);
-    println!("{:#?}", bs.extract_mi());
+    println!("{:#?}", res);
 }

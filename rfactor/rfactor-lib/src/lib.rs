@@ -43,9 +43,7 @@ impl str::FromStr for OpKind {
 }
 
 #[derive(Debug)]
-pub struct FactorGraph<'a> {
-    /// Map from var name to var id
-    names_ids: HashMap<&'a str, usize>,
+pub struct FactorGraph {
     /// Are vars continuous ?
     pub vars_cont: Vec<bool>,
     /// Number of leakage points for each variable
@@ -63,16 +61,24 @@ pub struct FactorGraph<'a> {
 }
 
 #[derive(Debug)]
-pub struct BeliefState<'a: 'b, 'b> {
+pub struct BeliefState<'a> {
     mi_vars: Vec<f64>,
     mi_edges_to_vars: Vec<Vec<f64>>,
-    factor_graph: &'b FactorGraph<'a>,
+    factor_graph: &'a FactorGraph,
 }
 
-impl<'a> FactorGraph<'a> {
-    pub fn new() -> FactorGraph<'a> {
+#[derive(Debug)]
+pub struct NamedFactorGraph<'a> {
+    /// Map from var name to var id
+    names_ids: HashMap<&'a str, usize>,
+    /// Factor graph
+    factor_graph: FactorGraph,
+}
+
+
+impl FactorGraph {
+    pub fn new() -> FactorGraph {
         FactorGraph {
-            names_ids: HashMap::new(),
             vars_cont: Vec::new(),
             vars_leakage: Vec::new(),
             ops: Vec::new(),
@@ -81,17 +87,12 @@ impl<'a> FactorGraph<'a> {
         }
     }
 
-    pub fn get_var_or_insert(&mut self, name: &'a str) -> usize {
-        if self.names_ids.contains_key(name) {
-            *self.names_ids.get(name).unwrap()
-        } else {
-            let id = self.vars_cont.len();
-            self.vars_cont.push(false);
-            self.vars_leakage.push(0);
-            self.nb_ops_var.push(0);
-            self.names_ids.insert(name, id);
-            id
-        }
+    pub fn add_var(&mut self) -> usize {
+        let id = self.vars_cont.len();
+        self.vars_cont.push(false);
+        self.vars_leakage.push(0);
+        self.nb_ops_var.push(0);
+        return id;
     }
 
     fn insert_op(&mut self, opkind: OpKind, operands: Vec<usize>) {
@@ -106,15 +107,7 @@ impl<'a> FactorGraph<'a> {
         self.ops.push((opkind, operands))
     }
 
-    pub fn insert_op_and_vars(&mut self, opkind: OpKind, operands: &[&'a str]) {
-        let operands_idx: Vec<_> = operands
-            .iter()
-            .map(|x| self.get_var_or_insert(x))
-            .collect();
-        self.insert_op(opkind, operands_idx);
-    }
-
-    pub fn new_belief_state<'b>(&'b self) -> BeliefState<'a, 'b> {
+    pub fn new_belief_state<'a>(&'a self) -> BeliefState<'a> {
         let mi_vars = iter::repeat(0.0).take(self.vars_cont.len()).collect();
         let mi_edges_to_vars = self.nb_ops_var
             .iter()
@@ -124,7 +117,52 @@ impl<'a> FactorGraph<'a> {
     }
 }
 
-impl<'a, 'b> BeliefState<'a, 'b> {
+impl<'a> NamedFactorGraph<'a> {
+    pub fn new() -> NamedFactorGraph<'a> {
+        NamedFactorGraph {
+            names_ids: HashMap::new(),
+            factor_graph: FactorGraph::new(),
+        }
+    }
+
+    pub fn get_var_or_insert(&mut self, name: &'a str) -> usize {
+        if self.names_ids.contains_key(&name) {
+            *self.names_ids.get(&name).unwrap()
+        } else {
+            let id = self.factor_graph.add_var();
+            self.names_ids.insert(name, id);
+            id
+        }
+    }
+
+    pub fn insert_op_and_vars(&mut self, opkind: OpKind, operands: &[&'a str]) {
+        let operands_idx: Vec<_> = operands
+            .into_iter()
+            .map(|x| self.get_var_or_insert(x))
+            .collect();
+        self.factor_graph.insert_op(opkind, operands_idx);
+    }
+    
+    pub fn belief_prop(
+        &self,
+        mi_leak: f64,
+        alpha: f64,
+        beta: f64,
+        n: u32,
+        mi_tol: f64,
+        max_iter: u32,
+                       ) -> (HashMap<&'a str, f64>, u32) {
+        let names_ids = &self.names_ids;
+        let factor_graph = &self.factor_graph;
+        let mut bp_state = factor_graph.new_belief_state();
+        let n_iter = bp_state.run_belief_propagation(mi_leak, alpha, beta, n, mi_tol, max_iter);
+        let res = names_ids.iter().map(
+            |(k, id)| (*k, bp_state.mi_vars[*id])
+            ).collect();
+        return (res, n_iter);
+    }
+}
+impl<'a> BeliefState<'a> {
     fn compute_vars_sums(&mut self, mi_leak: f64, n: u32) -> f64 {
         let mut max_delta = 0.0;
         for var in 0..self.factor_graph.vars_cont.len() {
@@ -207,16 +245,10 @@ impl<'a, 'b> BeliefState<'a, 'b> {
         panic!("Max iteration count exceeded. max_delta: {}\n {:#?}",
                max_delta, &self.mi_vars);
     }
-
-    pub fn extract_mi(&self) -> HashMap<&'a str, f64> {
-        self.factor_graph.names_ids.iter().map(
-            |(k, id)| (*k, self.mi_vars[*id])
-            ).collect()
-    }
 }
 
-pub fn parse_factor(s: &str) -> FactorGraph {
-    let mut graph = FactorGraph::new();
+pub fn parse_factor(s: &str) -> NamedFactorGraph {
+    let mut graph = NamedFactorGraph::new();
     for line in s.split('\n').filter(|x| !x.is_empty()) {
         let chunks: Vec<_> = line.split(' ').filter(|x|  !x.is_empty()).collect();
         assert!(chunks.len() >= 2);
@@ -229,11 +261,11 @@ pub fn parse_factor(s: &str) -> FactorGraph {
             "L" => {
                 assert!(chunks.len() == 3);
                 let id = graph.get_var_or_insert(chunks[1]);
-                graph.vars_leakage[id] = chunks[2].parse().unwrap();
+                graph.factor_graph.vars_leakage[id] = chunks[2].parse().unwrap();
             }
             "C" => {
                 let id = graph.get_var_or_insert(chunks[1]);
-                graph.vars_cont[id] = true;
+                graph.factor_graph.vars_cont[id] = true;
             }
             _ => panic!("Invalid line {}", line),
         };

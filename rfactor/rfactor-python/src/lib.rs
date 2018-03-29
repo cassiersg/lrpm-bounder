@@ -35,11 +35,9 @@ fn factor_mi<'a>(
     max_iter: u32
     ) -> PyResult<PyTuple> {
     let graph = parse_factor(factor);
-    let mut bs = graph.new_belief_state();
-    let nb_iter = bs.run_belief_propagation(
+    let res = graph.belief_prop(
         leakage, 1.0, 1.0, n_cont, precision, max_iter
         );
-    let res = (bs.extract_mi(), nb_iter);
     Ok(res.to_py_object(py))
 }
 
