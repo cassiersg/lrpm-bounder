@@ -106,7 +106,49 @@ def BBP15(d):
 
     return c
 
-muls = {'isw': isw, 'BBP15': BBP15}
+def pini1(d):
+    c = circuit_model.Circuit()
+    _, _, _, x, y, z = mul_preamble(d, c)
+
+    # not(x_i)
+    nx = [c.var(f'nx_{i}') for i in range(d)]
+    for i in range(d):
+        c.l_sum(nx[i], (x[i],))
+
+    # randoms & temps in matrix
+    r = [{j: c.var(f'r_{i}_{j}', kind='random' if j < i else 'intermediate')
+        for j in range(d) if j != i}
+        for i in range(d)]
+    for i in range(d):
+        for j in range(i):
+            c.p_sum(r[j][i], (r[i][j],))
+
+    s = [{j: c.var(f's_{i}_{j}') for j in range(d) if j != i}
+            for i in range(d)]
+    p = [{j: [c.var(f'p_{i}_{j}_{k}') for k in range(2)]
+        for j in range(d) if j != i}
+        for i in range(d)]
+    t = [{j: c.var(f't_{i}_{j}') for j in range(d)}
+            for i in range(d)]
+    for i in range(d):
+        c.l_prod(t[i][i], (x[i], y[i]))
+        for j in range(d):
+            if j != i:
+                c.l_sum(s[i][j], (y[j], r[i][j]))
+                c.l_prod(p[i][j][0], (nx[i], r[i][j]))
+                c.l_prod(p[i][j][1], (x[i], s[i][j]))
+                c.l_sum(t[i][j], (p[i][j][0], p[i][j][1]))
+
+    c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
+    for i in range(d):
+        c.p_sum(c_var[i][0], (t[i][0],))
+        for j in range(1, d):
+            c.l_sum(c_var[i][j], (c_var[i][j-1], t[i][j]))
+        c.p_sum(z[i], (c_var[i][d-1],))
+
+    return c
+
+muls = {'isw': isw, 'BBP15': BBP15, 'pini1': pini1}
 
 import sys
 
@@ -137,8 +179,8 @@ if __name__ == '__main__':
     except IndexError:
         d = 3
     #gen_all(d)
-    #for mul_name, mul_f in muls.items():
-    for mul_name, mul_f in [('BBP15', BBP15)]:
+    for mul_name, mul_f in muls.items():
+    #for mul_name, mul_f in [('pini1', pini1)]:
         print(f'---- {mul_name}, d={d} ----')
         print(mul_f(d))
         for _ in range(100):
