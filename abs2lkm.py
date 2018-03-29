@@ -21,7 +21,7 @@ import abs_circuit
 import muls_gen
 
 def export_circuit_model(cont_vars, bijections, leaking_ops, properties):
-    equalities, var_leakage, cont_vars, _ = abs_circuit.simplify_circuit_model(
+    equalities, var_leakage, cont_vars, var_map = abs_circuit.simplify_circuit_model(
             cont_vars, bijections, leaking_ops, properties)
     res = ''
     for op_kind, dest, ops in equalities:
@@ -30,7 +30,7 @@ def export_circuit_model(cont_vars, bijections, leaking_ops, properties):
         res += f'L {var} {leakage}\n'
     for var in cont_vars:
         res += f'C {var}\n'
-    return res
+    return res, var_map
 
 def convert(c):
     return export_circuit_model(*abs_circuit.circuit2abstract(c))
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     mul_kind = sys.argv[1]
     d = sys.argv[2]
     c = muls_gen.muls[mul_kind](int(d))
-    res = convert(c)
+    res, _ = convert(c)
     if len(sys.argv) < 4:
         print(res)
     else:
