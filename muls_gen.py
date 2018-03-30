@@ -148,7 +148,95 @@ def pini1(d):
 
     return c
 
-muls = {'isw': isw, 'BBP15': BBP15, 'pini1': pini1}
+def simple_ref(circuit, inputs, outputs=None, out_name=''):
+    d = len(inputs)
+    if outputs is None:
+        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+    c = circuit
+    r = [c.var(f'r_{i}', kind='random') for i in range(d-1)]
+    if d == 1:
+        c.p_sum(outputs[0], (inputs[0],))
+    elif d == 2:
+        c.l_sum(outputs[0], (inputs[0], r[0]))
+        c.l_sum(outputs[1], (inputs[1], r[0]))
+    elif d >= 3:
+        t = [c.var(f't_{i}') for i in range(d-2)]
+        for i in range(d-1):
+            c.l_sum(outputs[i], (inputs[i], r[i]))
+        c.l_sum(t[0], (inputs[-1], r[0]))
+        for i in range(1, d-2):
+            c.l_sum(t[i], (t[i-1], r[i]))
+        c.l_sum(outputs[d-1], (t[d-3], r[d-2]))
+    return outputs
+
+def bat_mat_mul(c, in_x, in_y, ref=simple_ref):
+    nx = len(in_x)
+    ny = len(in_y)
+    if nx == 1 and ny == 1:
+        out = c.var('')
+        c.l_prod(out, (in_x[0], in_y[0]))
+        return [[out]]
+    if nx == 1:
+        assert ny <= 2
+        outs = [c.var('') for _ in range(ny)]
+        for out, iy in zip(outs, in_y):
+            c.l_prod(out, (iy, in_x[0]))
+        return [outs]
+    elif ny == 1:
+        assert nx <= 2
+        outs = [c.var('') for _ in range(nx)]
+        for out, ix in zip(outs, in_x):
+            c.l_prod(out, (ix, in_y[0]))
+        return [[out] for out in outs]
+    else:
+        nx2 = nx//2
+        ny2 = ny//2
+        in_x1 = in_x[:nx2]
+        in_x2 = in_x[nx2:]
+        in_y1 = in_y[:ny2]
+        in_y2 = in_y[ny2:]
+        m11 = bat_mat_mul(c, in_x1, in_y1, ref)
+        in_x1 = ref(c, in_x1)
+        in_y1 = ref(c, in_y1)
+        m12 = bat_mat_mul(c, in_x1, in_y2, ref)
+        m21 = bat_mat_mul(c, in_x2, in_y1, ref)
+        in_x2 = ref(c, in_x2)
+        in_y2 = ref(c, in_y2)
+        m22 = bat_mat_mul(c, in_x2, in_y2, ref)
+        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
+
+
+def bat_mul(d):
+    c = circuit_model.Circuit()
+    _, _, _, x, y, z = mul_preamble(d, c)
+
+    # product matrix
+    p = bat_mat_mul(c, x, y)
+    r = [{j: c.var(f'r_{i}_{j}', kind='random') for j in range(i+1, d)}
+            for i in range(d)]
+    t = [{j: c.var(f't_{i}_{j}') for j in range(i+1, d)}
+            for i in range(d)]
+    s = [[c.var(f's_{i}_{j}') for j in range(d)]
+            for i in range(d)]
+    c_var = [[c.var(f's_{i}_{j}') for j in range(d)]
+            for i in range(d)]
+    for i in range(d):
+        for j in range(i+1, d):
+            c.p_sum(s[i][j], (r[i][j],))
+            c.l_sum(t[i][j], (r[i][j], p[i][j]))
+            c.l_sum(s[j][i], (t[i][j], p[j][i]))
+    for i in range(d):
+        c.p_sum(s[i][i], (p[i][i],))
+        c.p_sum(c_var[i][0], (s[i][0],))
+        for j in range(1, d):
+            c.l_sum(c_var[i][j], (c_var[i][j-1], s[i][j]))
+        c.p_sum(z[i], (c_var[i][d-1],))
+
+    return c
+
+
+muls = {'isw': isw, 'BBP15': BBP15, 'pini1': pini1, 'bat': bat_mul}
+refs = {'simple_ref': simple_ref}
 
 import sys
 
@@ -168,10 +256,22 @@ def assert_sh_prod(x, y, z):
 def test_mul(d, mul=isw):
     c = mul(d)
     g = circuit_model.CompGraph(c)
-    inputs, x, y  = gen_random_inputs(d)
+    inputs, x, y = gen_random_inputs(d)
     res, _ = g.compute(inputs)
     z = [v for var, v in res.items() if c.vars[var].name.startswith('z_')]
     assert_sh_prod(x, y, z)
+
+def test_refresh(d, ref=simple_ref):
+    circuit = circuit_model.Circuit()
+    var_inputs = [circuit.var(f'x_{i}', kind='input') for i in range(d)]
+    var_outputs = [circuit.var(f'y_{i}', kind='output') for i in range(d)]
+    ref(circuit=circuit, inputs=var_inputs, outputs=var_outputs)
+    g = circuit_model.CompGraph(circuit)
+    x = gen_random_input(d)
+    inputs = {f'x_{i}': v for i, v in enumerate(x)}
+    res, _ = g.compute(inputs)
+    y = [v for var, v in res.items() if circuit.vars[var].name.startswith('y_')]
+    assert (sum(x) % 2) == (sum(y) % 2)
 
 if __name__ == '__main__':
     try:
@@ -180,11 +280,21 @@ if __name__ == '__main__':
         d = 3
     #gen_all(d)
     for mul_name, mul_f in muls.items():
-    #for mul_name, mul_f in [('pini1', pini1)]:
+    #for mul_name, mul_f in [('bat', bat_mul)]:
         print(f'---- {mul_name}, d={d} ----')
         print(mul_f(d))
         for _ in range(100):
             test_mul(d, mul_f)
+    for ref_name, ref_f in refs.items():
+    #for ref_name, ref_f in ():
+        print(f'---- {ref_name}, d={d} ----')
+        circuit = circuit_model.Circuit()
+        var_inputs = [circuit.var(f'x_{i}', kind='input') for i in range(d)]
+        ref_f(circuit, var_inputs, out_name='y')
+        print(circuit)
+        for _ in range(100):
+            test_refresh(d, ref_f)
+
 
     #print(f'---- BBP15, d={d} ----')
     #print(BBP15(d))
