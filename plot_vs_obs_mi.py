@@ -13,10 +13,10 @@ def compute_target_mis(obs_mis, c, n_obs=1, tol=1e-3, var_name='x'):
     v = c.fmt_var([var for var in c.vars if var.name == var_name][0])
     s, var_map = abs2lkm.convert(c)
     x_name = var_map[v]
-    return [librfactor_python.factor_mi(s, obs_mi, n_obs, tol, 1000)[0][x_name] for obs_mi in obs_mis]
+    return [librfactor_python.factor_mi(s, obs_mi, n_obs, tol, 10000)[0][x_name] for obs_mi in obs_mis]
 
-color_circuit = {'isw': 'b', 'pini1': 'r', 'BBP15': 'g'}
-kind_d = {1: '-', 2: '.-', 4: '+-', 8: '*-', 16: '+-'}
+color_circuit = {'isw': 'b', 'pini1': 'r', 'BBP15': 'g', 'bat': 'k'}
+kind_d = {1: '-', 2: '.-', 4: '+-', 8: '*-', 16: '+-', 32: '-'}
 obs_mis = np.logspace(-3, -1, 30)
 res = dict()
 for circuit in color_circuit.keys():
