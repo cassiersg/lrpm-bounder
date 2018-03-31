@@ -1,6 +1,0 @@
-[package]
-name = "rfactor-lib"
-version = "0.1.0"
-authors = ["Gaëtan Cassiers <gaetan.cassiers@gmail.com>"]
-
-[dependencies]

@@ -3,10 +3,14 @@ name = "rfactor"
 version = "0.1.0"
 authors = ["Gaëtan Cassiers <gaetan.cassiers@gmail.com>"]
 
+[lib]
+name = "rfactor_python"
+crate-type = ["cdylib"]
+
 [dependencies]
 structopt = "0.2"
-rfactor-lib = { path = "rfactor-lib" }
 
-[workspace]
-members = ["rfactor-lib", "rfactor-python"]
+[dependencies.cpython]
+version = "0.1"
+features = ["extension-module"]
 
