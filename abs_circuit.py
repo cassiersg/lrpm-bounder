@@ -91,15 +91,17 @@ def build_graph(equalities):
         g.add_edges_from((name, f'v_{op}') for op in ops)
     return g
 
-def test_all_var_in_eq(cont_vars, bijections, equalities):
-    variables = list_vars(equalities)
-
 def simplify_circuit_model(cont_vars, bijections, leaking_ops, properties):
-    test_all_var_in_eq(cont_vars, bijections, leaking_ops | properties)
     var_map, cont_vars, leaking_ops, properties = canonicalize_vars(
             bijections, cont_vars, leaking_ops, properties)
     equalities = leaking_ops | properties
     variables = list_vars(equalities)
     var_leakage = compute_var_leakage(variables, leaking_ops)
     return equalities, var_leakage, cont_vars, var_map
+
+def var_leakage_and_eq(leaking_ops, properties):
+    equalities = leaking_ops | properties
+    variables = list_vars(equalities)
+    var_leakage = compute_var_leakage(variables, leaking_ops)
+    return equalities, var_leakage
 

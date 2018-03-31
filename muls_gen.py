@@ -8,8 +8,8 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
     x = c.var(x_name, continuous=True, kind='output')
     y = c.var(y_name, kind='output')
     z = c.var(z_name, kind='output')
-    c.bij((x, y))
-    c.bij((x, z))
+    c.bij(x, y)
+    c.bij(x, z)
     sh_x = []
     sh_y = []
     sh_z = []
@@ -17,9 +17,14 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
         sh_x.append(c.var(f'{x_name}_{i}', kind='input'))
         sh_y.append(c.var(f'{y_name}_{i}', kind='input'))
         sh_z.append(c.var(f'{z_name}_{i}', kind='output'))
-    c.p_sum(x, sh_x)
-    c.p_sum(y, sh_y)
-    c.p_sum(z, sh_z)
+    if d == 1:
+        c.bij(x, sh_x[0])
+        c.bij(y, sh_y[0])
+        c.bij(z, sh_z[0])
+    else:
+        c.p_sum(x, sh_x)
+        c.p_sum(y, sh_y)
+        c.p_sum(z, sh_z)
     return x, y, z, sh_x, sh_y, sh_z
 
 def isw(d):
@@ -39,7 +44,7 @@ def isw(d):
     m = [[c.var(f'm_{i}_{j}') for j in range(d)] for i in range(d)]
     for i in range(d):
         for j in range(i):
-            c.p_sum(m[i][j], (r[j][i],))
+            c.bij(m[i][j], r[j][i])
         for j in range(i+1, d):
             c.l_sum(t[i][j], (r[i][j], p[i][j]))
             c.l_sum(m[i][j], (t[i][j], p[j][i]))
@@ -47,11 +52,11 @@ def isw(d):
     # compression
     c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
     for i in range(d):
-        c.p_sum(m[i][i], (p[i][i],))
-        c.p_sum(c_var[i][0], (m[i][0],))
+        c.bij(m[i][i], p[i][i])
+        c.bij(c_var[i][0], m[i][0])
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], m[i][j]))
-        c.p_sum(z[i], (c_var[i][d-1],))
+        c.bij(z[i], c_var[i][d-1])
 
     return c
 
@@ -80,7 +85,7 @@ def BBP15(d):
             for i in range(d)
             ]
     for i in range(d):
-        c.p_sum(c_var[i][d2+2], (p[i][i],))
+        c.bij(c_var[i][d2+2], p[i][i])
         for j in range(d2, i+1, -2):
             c.l_sum(t[i][j][0], (r[i][j], p[i][j]))
             c.l_sum(t[i][j][1], (t[i][j][0], p[j][i]))
@@ -97,12 +102,12 @@ def BBP15(d):
             if i % 2 == 1:
                 c.l_sum(z[i], (c_var[i][i+1], r2[i]))
             else:
-                c.p_sum(z[i], (c_var[i][i+1],))
+                c.bij(z[i], c_var[i][i+1])
         else:
             for j in range(i-1, -1, -1):
                 c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
                 c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.p_sum(z[i], (c_var[i][2],))
+            c.bij(z[i], c_var[i][2])
 
     return c
 
@@ -121,7 +126,7 @@ def pini1(d):
         for i in range(d)]
     for i in range(d):
         for j in range(i):
-            c.p_sum(r[j][i], (r[i][j],))
+            c.bij(r[j][i], r[i][j])
 
     s = [{j: c.var(f's_{i}_{j}') for j in range(d) if j != i}
             for i in range(d)]
@@ -141,10 +146,10 @@ def pini1(d):
 
     c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
     for i in range(d):
-        c.p_sum(c_var[i][0], (t[i][0],))
+        c.bij(c_var[i][0], t[i][0])
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], t[i][j]))
-        c.p_sum(z[i], (c_var[i][d-1],))
+        c.bij(z[i], c_var[i][d-1])
 
     return c
 
@@ -155,7 +160,7 @@ def simple_ref(circuit, inputs, outputs=None, out_name=''):
     c = circuit
     r = [c.var(f'r_{i}', kind='random') for i in range(d-1)]
     if d == 1:
-        c.p_sum(outputs[0], (inputs[0],))
+        c.bij(outputs[0], inputs[0])
     elif d == 2:
         c.l_sum(outputs[0], (inputs[0], r[0]))
         c.l_sum(outputs[1], (inputs[1], r[0]))
@@ -222,15 +227,15 @@ def bat_mul(d):
             for i in range(d)]
     for i in range(d):
         for j in range(i+1, d):
-            c.p_sum(s[i][j], (r[i][j],))
+            c.bij(s[i][j], r[i][j])
             c.l_sum(t[i][j], (r[i][j], p[i][j]))
             c.l_sum(s[j][i], (t[i][j], p[j][i]))
     for i in range(d):
-        c.p_sum(s[i][i], (p[i][i],))
-        c.p_sum(c_var[i][0], (s[i][0],))
+        c.bij(s[i][i], p[i][i])
+        c.bij(c_var[i][0], s[i][0])
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], s[i][j]))
-        c.p_sum(z[i], (c_var[i][d-1],))
+        c.bij(z[i], c_var[i][d-1])
 
     return c
 

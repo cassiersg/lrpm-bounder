@@ -9,11 +9,13 @@ import muls_gen
 import librfactor_python
 
 
-def compute_target_mis(obs_mis, c, n_obs=1, tol=1e-3, var_name='x'):
+def compute_target_mis(obs_mi, c, n_obs=1, tol=1e-3, var_name='x'):
+    abs_c_idx, var_map = abs2lkm.circuit2abs_idx(c)
     v = c.fmt_var([var for var in c.vars if var.name == var_name][0])
-    s, var_map = abs2lkm.convert(c)
-    x_name = var_map[v]
-    return [librfactor_python.factor_mi(s, obs_mi, n_obs, tol, 10000)[0][x_name] for obs_mi in obs_mis]
+    x_idx = var_map[v]
+    pfg = librfactor_python.PyFactorGraph(*abs_c_idx)
+    return [pfg.bp_mi(obs_mi, n_obs, tol, 1.0, 1.0, 10000)[0][x_idx]
+            for obs_mi in obs_mis]
 
 color_circuit = {'isw': 'b', 'pini1': 'r', 'BBP15': 'g', 'bat': 'k'}
 kind_d = {1: '-', 2: '.-', 4: '+-', 8: '*-', 16: '+-', 32: '-'}
@@ -28,5 +30,5 @@ plt.xlabel('obs_mi')
 plt.ylabel('target_mi')
 plt.legend()
 plt.title(f'1 obs')
-plt.show()
+#plt.show()
 

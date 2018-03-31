@@ -7,6 +7,7 @@ import networkx as nx
 
 import utils
 
+
 class Circuit:
     def __init__(self):
         self.vars = []
@@ -21,8 +22,8 @@ class Circuit:
         self.vars.append(v)
         return v
 
-    def bij(self, ops):
-        self.bijs.append(ops)
+    def bij(self, dest, op):
+        self.bijs.append((dest, op))
 
     def l_sum(self, dest, ops):
         self.l_sums.append((dest, ops))
@@ -60,6 +61,45 @@ class Circuit:
                 (self.fmt_cont(var) for var in self.vars if var.continuous),
                 ))
 
+    def simplified(self):
+        map_vars = list(range(len(self.vars)))
+        rev_map_vars = list({x} for x in range(len(self.vars)))
+        for dest, op in self.bijs:
+            idxs = (map_vars[dest.idx], map_vars[op.idx])
+            to_merge = max(idxs)
+            merge_into = min(idxs)
+            for v in rev_map_vars[to_merge]:
+                map_vars[v] = merge_into
+            rev_map_vars[merge_into] |= rev_map_vars[to_merge]
+            rev_map_vars[to_merge] = None
+        rem_vars = [i for i, rv in enumerate(rev_map_vars) if rv is not None]
+        nm = {v: i for i, v in enumerate(rem_vars)}
+        final_map = [nm[mv] for mv in map_vars]
+        new_c = Circuit()
+        for v in rem_vars:
+            continuous = any(self.vars[ov].continuous for ov in rev_map_vars[v])
+            if any(self.vars[ov].kind == 'input' for ov in rev_map_vars[v]):
+                kind = 'input'
+            elif any(self.vars[ov].kind == 'random' for ov in rev_map_vars[v]):
+                kind = 'random'
+            else:
+                kind = 'intermediate'
+            new_c.var(self.vars[v].name, continuous, kind)
+        for attr in ('l_sums', 'p_sums', 'l_prods', 'p_prods'):
+            setattr(new_c,
+                    attr,
+                    [(new_c.vars[final_map[dest.idx]], [new_c.vars[final_map[op.idx]] for op in ops])
+                        for (dest, ops) in getattr(self, attr)])
+        return new_c, final_map
+
+    def var_leakage(self):
+        leakage = [0]*len(self.vars)
+        for dest, ops in self.l_sums + self.l_prods:
+            leakage[dest] += 1
+            for op in ops:
+                leakage[op] += 1
+        return leakage
+
 
 class Variable:
     def __init__(self, name, idx, continuous, kind):
@@ -90,6 +130,9 @@ class CompGraph:
             self.g.nodes[dest.idx]['op'] = '*'
             for op in ops:
                 self.g.add_edge(op.idx, dest.idx)
+        for (dest, op) in self.circuit.bijs:
+            self.g.nodes[dest.idx]['op'] = '='
+            self.g.add_edge(op.idx, dest.idx)
         for node, attrs in self.g.nodes.items():
             assert 'input' in attrs or 'random' in attrs or 'op' in attrs, f'noinput node {self.circuit.fmt_var(self.circuit.vars[node])}'
 
@@ -107,7 +150,7 @@ class CompGraph:
                 values[var.idx] = random.choice(self.domain)
         for idx in nx.topological_sort(self.g):
             if values[idx] is None:
-                op = {'+': sum, '*': utils.product}[self.g.nodes[idx]['op']]
+                op = {'+': sum, '*': utils.product, '=': sum}[self.g.nodes[idx]['op']]
                 values[idx] = op(values[pred] for pred in self.g.predecessors(idx))
         output_res = {
             var.idx: values[var.idx] for var in self.circuit.vars

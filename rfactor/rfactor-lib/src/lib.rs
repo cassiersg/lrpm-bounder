@@ -62,7 +62,7 @@ pub struct FactorGraph {
 
 #[derive(Debug)]
 pub struct BeliefState<'a> {
-    mi_vars: Vec<f64>,
+    pub mi_vars: Vec<f64>,
     mi_edges_to_vars: Vec<Vec<f64>>,
     factor_graph: &'a FactorGraph,
 }
@@ -85,6 +85,33 @@ impl FactorGraph {
             nb_ops_var: Vec::new(),
             operands_op_ids: Vec::new(),
         }
+    }
+
+    pub fn from_vars_and_ops(vars_cont: Vec<bool>, vars_leakage: Vec<u32>, ops: Vec<(OpKind, Vec<usize>)>) -> FactorGraph {
+        assert_eq!(vars_cont.len(), vars_leakage.len());
+        let n = vars_cont.len();
+        for &(_, ref operands) in ops.iter() {
+            for operand in operands.iter() {
+                assert!(*operand < n);
+            }
+        }
+        let mut nb_ops_var: Vec<usize> = iter::repeat(0).take(n).collect();
+        let mut operands_op_ids = Vec::with_capacity(ops.len());
+        for &(_, ref operands) in ops.iter() {
+            let mut ids = Vec::with_capacity(operands.len());
+            for operand in operands.iter() {
+                ids.push(nb_ops_var[*operand]);
+                nb_ops_var[*operand] += 1;
+            }
+            operands_op_ids.push(ids);
+        }
+        return FactorGraph {
+            vars_cont,
+            vars_leakage,
+            ops,
+            nb_ops_var,
+            operands_op_ids,
+        };
     }
 
     pub fn add_var(&mut self) -> usize {
@@ -162,6 +189,7 @@ impl<'a> NamedFactorGraph<'a> {
         return (res, n_iter);
     }
 }
+
 impl<'a> BeliefState<'a> {
     fn compute_vars_sums(&mut self, mi_leak: f64, n: u32) -> f64 {
         let mut max_rel_delta = 0.0;

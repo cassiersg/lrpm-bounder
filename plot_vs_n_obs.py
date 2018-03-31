@@ -10,10 +10,11 @@ import librfactor_python
 
 
 def compute_target_mis(obs_mi, c, ns_obs, tol=1e-3, var_name='x'):
+    abs_c_idx, var_map = abs2lkm.circuit2abs_idx(c)
     v = c.fmt_var([var for var in c.vars if var.name == var_name][0])
-    s, var_map = abs2lkm.convert(c)
-    x_name = var_map[v]
-    return [librfactor_python.factor_mi(s, obs_mi, n_obs, tol, 1000)[0][x_name] for n_obs in ns_obs]
+    x_idx = var_map[v]
+    pfg = librfactor_python.PyFactorGraph(*abs_c_idx)
+    return [pfg.bp_mi(obs_mi, n_obs, tol, 1.0, 1.0, 1000)[0][x_idx] for n_obs in ns_obs]
 
 circuit = 'isw'
 color_d = {2: 'g', 3: 'b', 4: 'r'}
