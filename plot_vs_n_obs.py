@@ -1,16 +1,13 @@
 
-from pprint import pprint
-
 import numpy as np
 from matplotlib import pyplot as plt
 
-import abs2lkm
 import muls_gen
 import librfactor_python
 
 
 def compute_target_mis(obs_mi, c, ns_obs, tol=1e-3, var_name='x'):
-    abs_c_idx, var_map = abs2lkm.circuit2abs_idx(c)
+    abs_c_idx, var_map = c.to_lkm()
     v = c.fmt_var([var for var in c.vars if var.name == var_name][0])
     x_idx = var_map[v]
     pfg = librfactor_python.PyFactorGraph(*abs_c_idx)
