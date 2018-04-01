@@ -174,6 +174,50 @@ def simple_ref(circuit, inputs, outputs=None, out_name=''):
         c.l_sum(outputs[d-1], (t[d-3], r[d-2]))
     return outputs
 
+def isw_ref(circuit, inputs, outputs=None, out_name=''):
+    d = len(inputs)
+    if outputs is None:
+        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+    c = [[circuit.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
+    r = [{j: circuit.var(f'r_{i}_{j}', kind='random') for j in range(i)} for i in range(d)]
+    for i in range(d):
+        circuit.bij(c[i][0], inputs[i])
+        circuit.bij(outputs[i], c[i][d-1])
+    for i in range(d):
+        for j in range(i):
+            circuit.l_sum(c[i][j+1], (c[i][j], r[i][j]))
+        for j in range(i+1, d):
+            circuit.l_sum(c[i][j], (c[i][j-1], r[j][i]))
+    return outputs
+
+def bat_ref_layer(circuit, inputs, outputs, d, d2):
+    r = [circuit.var(f'r_{i}', kind='random') for i in range(d2)]
+    for i in range(d2):
+        circuit.l_sum(outputs[i], (inputs[i], r[i]))
+        circuit.l_sum(outputs[d2+i], (inputs[d2+i], r[i]))
+    if d % 2 == 1:
+        circuit.bij(outputs[d-1], inputs[d-1])
+
+def bat_ref(circuit, inputs, outputs=None, out_name=''):
+    d = len(inputs)
+    if outputs is None:
+        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+    if d == 1:
+        circuit.bij(outputs[0], inputs[0])
+    elif d == 2:
+        r = circuit.var('r', kind='random')
+        circuit.l_sum(outputs[0], (inputs[0], r))
+        circuit.l_sum(outputs[1], (inputs[1], r))
+    else:
+        d2 = d//2
+        b = [circuit.var(f'b_{i}') for i in range(d)]
+        bat_ref_layer(circuit, inputs, b, d, d2)
+        c = [circuit.var(f'b_{i}') for i in range(d)]
+        bat_ref(circuit, b[:d2], c[:d2])
+        bat_ref(circuit, b[d2:], c[d2:])
+        bat_ref_layer(circuit, c, outputs, d, d2)
+    return outputs
+
 def bat_mat_mul(c, in_x, in_y, ref=simple_ref):
     nx = len(in_x)
     ny = len(in_y)
@@ -211,12 +255,12 @@ def bat_mat_mul(c, in_x, in_y, ref=simple_ref):
         return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
 
 
-def bat_mul(d):
+def bat_mul(d, ref=simple_ref):
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
 
     # product matrix
-    p = bat_mat_mul(c, x, y)
+    p = bat_mat_mul(c, x, y, ref)
     r = [{j: c.var(f'r_{i}_{j}', kind='random') for j in range(i+1, d)}
             for i in range(d)]
     t = [{j: c.var(f't_{i}_{j}') for j in range(i+1, d)}
@@ -240,8 +284,19 @@ def bat_mul(d):
     return c
 
 
-muls = {'isw': isw, 'BBP15': BBP15, 'pini1': pini1, 'bat': bat_mul}
-refs = {'simple_ref': simple_ref}
+muls = {
+        'isw': isw,
+        'BBP15': BBP15,
+        'pini1': pini1,
+        'bat_simple_ref': bat_mul,
+        'bat_isw_ref': lambda d: bat_mul(d, ref=isw_ref),
+        'bat_bat_ref': lambda d: bat_mul(d, ref=bat_ref),
+        }
+refs = {
+        'simple_ref': simple_ref,
+        'isw_ref': isw_ref,
+        'bat_ref': bat_ref,
+        }
 
 import sys
 
@@ -285,7 +340,7 @@ if __name__ == '__main__':
         d = 3
     #gen_all(d)
     for mul_name, mul_f in muls.items():
-    #for mul_name, mul_f in [('bat', bat_mul)]:
+    #for mul_name, mul_f in []:
         print(f'---- {mul_name}, d={d} ----')
         print(mul_f(d))
         for _ in range(100):
