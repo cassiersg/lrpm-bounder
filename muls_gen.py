@@ -3,103 +3,7 @@ import itertools as it
 import random
 
 import circuit_model
-
-def simple_ref(circuit, inputs, outputs=None, out_name='sr'):
-    d = len(inputs)
-    if outputs is None:
-        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
-    c = circuit
-    r = [c.var(f'r_{i}', kind='random') for i in range(d-1)]
-    if d == 1:
-        c.bij(outputs[0], inputs[0])
-    elif d == 2:
-        c.l_sum(outputs[0], (inputs[0], r[0]))
-        c.l_sum(outputs[1], (inputs[1], r[0]))
-    elif d >= 3:
-        t = [c.var(f't_{i}') for i in range(d-2)]
-        for i in range(d-1):
-            c.l_sum(outputs[i], (inputs[i], r[i]))
-        c.l_sum(t[0], (inputs[-1], r[0]))
-        for i in range(1, d-2):
-            c.l_sum(t[i], (t[i-1], r[i]))
-        c.l_sum(outputs[d-1], (t[d-3], r[d-2]))
-    return outputs
-
-def isw_ref(circuit, inputs, outputs=None, out_name=''):
-    d = len(inputs)
-    if outputs is None:
-        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
-    c = [[circuit.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
-    r = [{j: circuit.var(f'r_{i}_{j}', kind='random') for j in range(i)} for i in range(d)]
-    for i in range(d):
-        circuit.bij(c[i][0], inputs[i])
-        circuit.bij(outputs[i], c[i][d-1])
-    for i in range(d):
-        for j in range(i):
-            circuit.l_sum(c[i][j+1], (c[i][j], r[i][j]))
-        for j in range(i+1, d):
-            circuit.l_sum(c[i][j], (c[i][j-1], r[j][i]))
-    return outputs
-
-def bat_ref_layer(circuit, inputs, outputs, d, d2):
-    r = [circuit.var(f'r_{i}', kind='random') for i in range(d2)]
-    for i in range(d2):
-        circuit.l_sum(outputs[i], (inputs[i], r[i]))
-        circuit.l_sum(outputs[d2+i], (inputs[d2+i], r[i]))
-    if d % 2 == 1:
-        circuit.bij(outputs[d-1], inputs[d-1])
-
-def bat_ref(circuit, inputs, outputs=None, out_name=''):
-    d = len(inputs)
-    if outputs is None:
-        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
-    if d == 1:
-        circuit.bij(outputs[0], inputs[0])
-    elif d == 2:
-        r = circuit.var('r', kind='random')
-        circuit.l_sum(outputs[0], (inputs[0], r))
-        circuit.l_sum(outputs[1], (inputs[1], r))
-    else:
-        d2 = d//2
-        b = [circuit.var(f'b_{i}') for i in range(d)]
-        bat_ref_layer(circuit, inputs, b, d, d2)
-        c = [circuit.var(f'b_{i}') for i in range(d)]
-        bat_ref(circuit, b[:d2], c[:d2])
-        bat_ref(circuit, b[d2:], c[d2:])
-        bat_ref_layer(circuit, c, outputs, d, d2)
-    return outputs
-
-def half_ref(circuit, inputs, outputs=None, out_name=''):
-    d = len(inputs)
-    if outputs is None:
-        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
-    if d == 1:
-        circuit.bij(outputs[0], inputs[0])
-    else:
-        d2 = d//2
-        bat_ref_layer(circuit, inputs, outputs, d, d2)
-    return outputs
-
-def half1_ref(circuit, inputs, outputs=None, out_name=''):
-    d = len(inputs)
-    if outputs is None:
-        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
-    if d == 1:
-        circuit.bij(outputs[0], inputs[0])
-    else:
-        d2 = d//2
-        r = [circuit.var(f'r_{i}', kind='random') for i in range(d2)]
-        if d % 2 == 1:
-            r = circuit.var('r', kind='random')
-            t = circuit.var('t')
-            circuit.l_sum(outputs[d-1], (inputs[d-1], r))
-            circuit.l_sum(t, (inputs[0], r))
-            inputs = [t] + inputs[1:]
-        for i in range(d2):
-            circuit.l_sum(outputs[i], (inputs[i], r[i]))
-            circuit.l_sum(outputs[d2+i], (inputs[d2+i], r[i]))
-    return outputs
-
+import refs_gen
 
 def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
     x = c.var(x_name, continuous=True, kind='output')
@@ -397,7 +301,7 @@ def pini3(d):
 
     return c
 
-def pini4(d, ref=simple_ref):
+def pini4(d, ref=refs_gen.simple_ref):
     d2 = d-1
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
@@ -471,7 +375,7 @@ def pini4(d, ref=simple_ref):
 
     return c
 
-def pini5(d, ref=simple_ref):
+def pini5(d, ref=refs_gen.simple_ref):
     d2 = d-1
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
@@ -544,7 +448,7 @@ def pini5(d, ref=simple_ref):
     return c
 
 
-def bat_mat_mul(c, in_x, in_y, ref=simple_ref):
+def bat_mat_mul(c, in_x, in_y, ref=refs_gen.simple_ref):
     nx = len(in_x)
     ny = len(in_y)
     if nx == 1 and ny == 1:
@@ -580,7 +484,7 @@ def bat_mat_mul(c, in_x, in_y, ref=simple_ref):
         m22 = bat_mat_mul(c, in_x2, in_y2, ref)
         return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
 
-def pini_bat_mat_gen(c, in_x, in_y, ref=simple_ref):
+def pini_bat_mat_gen(c, in_x, in_y, ref=refs_gen.simple_ref):
     nx = len(in_x)
     ny = len(in_y)
     if nx == 1 and ny == 1:
@@ -609,7 +513,7 @@ def pini_bat_mat_gen(c, in_x, in_y, ref=simple_ref):
         return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
 
 
-def bat_mul(d, ref=simple_ref):
+def bat_mul(d, ref=refs_gen.simple_ref):
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
 
@@ -647,15 +551,10 @@ muls = {
         'pini4': pini4,
         'pini5': pini5,
         'bat_simple_ref': bat_mul,
-        'bat_isw_ref': lambda d: bat_mul(d, ref=isw_ref),
-        'bat_bat_ref': lambda d: bat_mul(d, ref=bat_ref),
-        'bat_half_ref': lambda d: bat_mul(d, ref=half_ref),
-        'bat_half1_ref': lambda d: bat_mul(d, ref=half1_ref),
-        }
-refs = {
-        'simple_ref': simple_ref,
-        'isw_ref': isw_ref,
-        'bat_ref': bat_ref,
+        'bat_isw_ref': lambda d: bat_mul(d, ref=refs_gen.isw_ref),
+        'bat_bat_ref': lambda d: bat_mul(d, ref=refs_gen.bat_ref),
+        'bat_half_ref': lambda d: bat_mul(d, ref=refs_gen.half_ref),
+        'bat_half1_ref': lambda d: bat_mul(d, ref=refs_gen.half1_ref),
         }
 
 import sys
@@ -681,7 +580,7 @@ def test_mul(d, mul=isw):
     z = [v for var, v in res.items() if c.vars[var].name.startswith('z_')]
     assert_sh_prod(x, y, z)
 
-def test_refresh(d, ref=simple_ref):
+def test_refresh(d, ref=refs_gen.simple_ref):
     circuit = circuit_model.Circuit()
     var_inputs = [circuit.var(f'x_{i}', kind='input') for i in range(d)]
     var_outputs = [circuit.var(f'y_{i}', kind='output') for i in range(d)]
@@ -698,30 +597,10 @@ if __name__ == '__main__':
         d = int(sys.argv[1])
     except IndexError:
         d = 3
-    #gen_all(d)
     for mul_name, mul_f in muls.items():
     #for mul_name, mul_f in []:
         print(f'---- {mul_name}, d={d} ----')
         print(mul_f(d))
         for _ in range(100):
             test_mul(d, mul_f)
-    for ref_name, ref_f in refs.items():
-    #for ref_name, ref_f in ():
-        print(f'---- {ref_name}, d={d} ----')
-        circuit = circuit_model.Circuit()
-        var_inputs = [circuit.var(f'x_{i}', kind='input') for i in range(d)]
-        ref_f(circuit, var_inputs, out_name='y')
-        print(circuit)
-        for _ in range(100):
-            test_refresh(d, ref_f)
-
-
-    #print(f'---- BBP15, d={d} ----')
-    #print(BBP15(d))
-    #print(f'---- pini1, d={d} ----')
-    #print(pini1(d))
-    #print(f'---- pini2, d={d} ----')
-    #print(pini2(d))
-    #print(f'---- isw_ref, d={d} ----')
-    #print(isw_ref(d, 'ref', 'a', 'b', range(5, 5+d), range(10, 10+d)))
 
