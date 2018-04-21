@@ -16,10 +16,13 @@ def compute_target_mis(obs_mi, c, n_obs=1, tol=1e-3, var_name='x'):
 
 color_circuit = [
         'BBP15',
-        'pini1',
+        #'pini1',
         #'pini2',
-        'pini3',
-        'pini4', 'pini5',
+        #'pini3',
+        #'pini4',
+        'pini5',
+        'pini5dr',
+        'pini5drbat',
         'bat_simple_ref',
         'bat_bat_ref',
         #'bat_half_ref', 'bat_half1_ref', 'bat_isw_ref',
@@ -30,7 +33,7 @@ kind_d = {
         4: '+-',
         #8: '*-',
         16: '+-',
-        32: '-',
+        32: '+-',
         }
 obs_mis = np.logspace(-3, -1, 30)
 res = dict()

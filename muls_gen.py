@@ -28,6 +28,66 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
         c.p_sum(z, sh_z)
     return x, y, z, sh_x, sh_y, sh_z
 
+def pini_bat_mat_gen(c, in_x, in_y, ref=refs_gen.simple_ref):
+    nx = len(in_x)
+    ny = len(in_y)
+    if nx == 1 and ny == 1:
+        return [[(in_x[0], in_y[0])]]
+    if nx == 1:
+        assert ny <= 2
+        return [[(in_x[0], iy) for iy in in_y]]
+    elif ny == 1:
+        assert nx <= 2
+        return [[(ix, in_y[0])] for ix in in_x]
+    else:
+        nx2 = nx//2
+        ny2 = ny//2
+        in_x1 = in_x[:nx2]
+        in_x2 = in_x[nx2:]
+        in_y1 = in_y[:ny2]
+        in_y2 = in_y[ny2:]
+        m11 = pini_bat_mat_gen(c, in_x1, in_y1, ref)
+        in_x1 = ref(c, in_x1)
+        in_y1 = ref(c, in_y1)
+        m12 = pini_bat_mat_gen(c, in_x1, in_y2, ref)
+        m21 = pini_bat_mat_gen(c, in_x2, in_y1, ref)
+        in_x2 = ref(c, in_x2)
+        in_y2 = ref(c, in_y2)
+        m22 = pini_bat_mat_gen(c, in_x2, in_y2, ref)
+        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
+
+def pini_bat_mat_gen_dr(c, in_x, in_y, ref=refs_gen.simple_ref):
+    nx = len(in_x)
+    ny = len(in_y)
+    if nx == 1 and ny == 1:
+        return [[(in_x[0], in_y[0])]]
+    if nx == 1:
+        assert ny <= 2
+        return [[(in_x[0], iy) for iy in in_y]]
+    elif ny == 1:
+        assert nx <= 2
+        return [[(ix, in_y[0])] for ix in in_x]
+    else:
+        nx2 = nx//2
+        ny2 = ny//2
+        in_x1 = in_x[:nx2]
+        in_x2 = in_x[nx2:]
+        in_y1 = in_y[:ny2]
+        in_y2 = in_y[ny2:]
+        in_x1_1 = ref(c, in_x1)
+        in_x1_2 = ref(c, in_x1)
+        in_y1_1 = ref(c, in_y1)
+        in_y1_2 = ref(c, in_y1)
+        in_x2_1 = ref(c, in_x2)
+        in_x2_2 = ref(c, in_x2)
+        in_y2_1 = ref(c, in_y2)
+        in_y2_2 = ref(c, in_y2)
+        m11 = pini_bat_mat_gen(c, in_x1_1, in_y1_1, ref)
+        m12 = pini_bat_mat_gen(c, in_x1_2, in_y2_1, ref)
+        m21 = pini_bat_mat_gen(c, in_x2_1, in_y1_2, ref)
+        m22 = pini_bat_mat_gen(c, in_x2_2, in_y2_2, ref)
+        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
+
 def isw(d):
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
@@ -301,7 +361,7 @@ def pini3(d):
 
     return c
 
-def pini4(d, ref=refs_gen.simple_ref):
+def pini4(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen):
     d2 = d-1
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
@@ -313,7 +373,7 @@ def pini4(d, ref=refs_gen.simple_ref):
         for j in range(i+1, d)} for i in range(d)]
     p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
         for j in range(i+1, d)} for i in range(d)]
-    ref_prods = pini_bat_mat_gen(c, x, y, ref=ref)
+    ref_prods = mat_gen(c, x, y, ref=ref)
     for i in range(d):
         for j in range(i+1, d):
             c.l_sum(s[i][j], (s1[i], s1[j]))
@@ -375,7 +435,7 @@ def pini4(d, ref=refs_gen.simple_ref):
 
     return c
 
-def pini5(d, ref=refs_gen.simple_ref):
+def pini5(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen):
     d2 = d-1
     c = circuit_model.Circuit()
     _, _, _, x, y, z = mul_preamble(d, c)
@@ -386,7 +446,7 @@ def pini5(d, ref=refs_gen.simple_ref):
         for j in range(i+1, d)} for i in range(d)]
     p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
         for j in range(i+1, d)} for i in range(d)]
-    ref_prods = pini_bat_mat_gen(c, x, y, ref=ref)
+    ref_prods = mat_gen(c, x, y, ref=ref)
     for i in range(d):
         for j in range(i+1, d):
             xi, yj = ref_prods[i][j]
@@ -484,34 +544,6 @@ def bat_mat_mul(c, in_x, in_y, ref=refs_gen.simple_ref):
         m22 = bat_mat_mul(c, in_x2, in_y2, ref)
         return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
 
-def pini_bat_mat_gen(c, in_x, in_y, ref=refs_gen.simple_ref):
-    nx = len(in_x)
-    ny = len(in_y)
-    if nx == 1 and ny == 1:
-        return [[(in_x[0], in_y[0])]]
-    if nx == 1:
-        assert ny <= 2
-        return [[(in_x[0], iy) for iy in in_y]]
-    elif ny == 1:
-        assert nx <= 2
-        return [[(ix, in_y[0])] for ix in in_x]
-    else:
-        nx2 = nx//2
-        ny2 = ny//2
-        in_x1 = in_x[:nx2]
-        in_x2 = in_x[nx2:]
-        in_y1 = in_y[:ny2]
-        in_y2 = in_y[ny2:]
-        m11 = pini_bat_mat_gen(c, in_x1, in_y1, ref)
-        in_x1 = ref(c, in_x1)
-        in_y1 = ref(c, in_y1)
-        m12 = pini_bat_mat_gen(c, in_x1, in_y2, ref)
-        m21 = pini_bat_mat_gen(c, in_x2, in_y1, ref)
-        in_x2 = ref(c, in_x2)
-        in_y2 = ref(c, in_y2)
-        m22 = pini_bat_mat_gen(c, in_x2, in_y2, ref)
-        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
-
 
 def bat_mul(d, ref=refs_gen.simple_ref):
     c = circuit_model.Circuit()
@@ -550,6 +582,9 @@ muls = {
         'pini3': pini3,
         'pini4': pini4,
         'pini5': pini5,
+        'pini4dr': lambda d: pini4(d, mat_gen=pini_bat_mat_gen_dr),
+        'pini5dr': lambda d: pini5(d, mat_gen=pini_bat_mat_gen_dr),
+        'pini5drbat': lambda d: pini5(d, ref=refs_gen.bat_ref, mat_gen=pini_bat_mat_gen_dr),
         'bat_simple_ref': bat_mul,
         'bat_isw_ref': lambda d: bat_mul(d, ref=refs_gen.isw_ref),
         'bat_bat_ref': lambda d: bat_mul(d, ref=refs_gen.bat_ref),
@@ -579,18 +614,6 @@ def test_mul(d, mul=isw):
     res, _ = g.compute(inputs)
     z = [v for var, v in res.items() if c.vars[var].name.startswith('z_')]
     assert_sh_prod(x, y, z)
-
-def test_refresh(d, ref=refs_gen.simple_ref):
-    circuit = circuit_model.Circuit()
-    var_inputs = [circuit.var(f'x_{i}', kind='input') for i in range(d)]
-    var_outputs = [circuit.var(f'y_{i}', kind='output') for i in range(d)]
-    ref(circuit=circuit, inputs=var_inputs, outputs=var_outputs)
-    g = circuit_model.CompGraph(circuit)
-    x = gen_random_input(d)
-    inputs = {f'x_{i}': v for i, v in enumerate(x)}
-    res, _ = g.compute(inputs)
-    y = [v for var, v in res.items() if circuit.vars[var].name.startswith('y_')]
-    assert (sum(x) % 2) == (sum(y) % 2)
 
 if __name__ == '__main__':
     try:
