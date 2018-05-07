@@ -99,6 +99,38 @@ def half1_ref(circuit, inputs, outputs=None, out_name=''):
             circuit.l_sum(outputs[d2+i], (inputs[d2+i], r[i]))
     return outputs
 
+def rot_ref(circuit, inputs, outputs=None, out_name=''):
+    d = len(inputs)
+    if outputs is None:
+        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+    if d == 1:
+        circuit.bij(outputs[0], inputs[0])
+    else:
+        randoms = [circuit.var(f'r_{i}', kind='random') for i in range(d)]
+        temps = [circuit.var(f'temp_{i}') for i in range(d)]
+        for i, r, t in zip(inputs, randoms, temps):
+            circuit.l_sum(t, (i, r))
+        for o, r, t in zip(outputs, randoms[1:] + [randoms[0]], temps):
+            circuit.l_sum(o, (t, r))
+    return outputs
+
+def barthe_rd_ref(circuit, inputs, outputs=None, out_name='', n_iter=1):
+    tmps = inputs
+    for _ in range(n_iter-1):
+        tmps = rot_ref(circuit, tmps)
+    return rot_ref(circuit, tmps, outputs, out_name)
+
+def barthe_sni_n_rounds(n_shares):
+    if n_shares in (3, 4): return 1
+    elif n_shares in (5, 6, 7): return 2
+    elif n_shares in (8, 9, 10): return 3
+    elif n_shares == 11: return 4
+    else: raise ValueError('not SNI')
+
+def barthe_ref(circuit, inputs, outputs=None, out_name=''):
+    n_rounds = barthe_sni_n_rounds(len(inputs))
+    return barthe_rd_ref(circuit, inputs, outputs, out_name, n_rounds)
+
 
 refs = {
         'simple_ref': simple_ref,
@@ -106,7 +138,19 @@ refs = {
         'bat_ref': bat_ref,
         'half_ref': half_ref,
         'half1_ref': half1_ref,
+        'barthe_ref': barthe_ref,
         }
+
+def ref_generator(d, ref, io_sums=False):
+    circuit = circuit_model.Circuit()
+    var_inputs = [circuit.var(f'x_{i}', kind='input') for i in range(d)]
+    var_outputs = [circuit.var(f'y_{i}', kind='output') for i in range(d)]
+    ref(circuit=circuit, inputs=var_inputs, outputs=var_outputs)
+    if io_sums:
+        s = circuit.var('s')
+        circuit.p_sum(s, var_inputs)
+        circuit.p_sum(s, var_outputs)
+    return circuit
 
 
 def gen_random_input(d, domain=(0,1)):

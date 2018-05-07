@@ -26,15 +26,19 @@ class Circuit:
         self.bijs.append((dest, op))
 
     def l_sum(self, dest, ops):
+        assert isinstance(dest, Variable) and all(isinstance(op, Variable) for op in ops)
         self.l_sums.append((dest, ops))
 
     def p_sum(self, dest, ops):
+        assert isinstance(dest, Variable) and all(isinstance(op, Variable) for op in ops)
         self.p_sums.append((dest, ops))
 
     def l_prod(self, dest, ops):
+        assert isinstance(dest, Variable) and all(isinstance(op, Variable) for op in ops)
         self.l_prods.append((dest, ops))
 
     def p_prod(self, dest, ops):
+        assert isinstance(dest, Variable) and all(isinstance(op, Variable) for op in ops)
         self.p_prods.append((dest, ops))
 
     def fmt_var(self, var):
@@ -92,22 +96,37 @@ class Circuit:
                         for (dest, ops) in getattr(self, attr)])
         return new_c, final_map
 
-    def var_leakage(self):
-        leakage = [0]*len(self.vars)
+    def var_leakage(self, rand_var_leak=1, only_inputs_leak=False):
+        leakage = [rand_var_leak*int(var.kind == 'random') for var in self.vars]
+        #leakage = [0]*len(self.vars)
         for dest, ops in self.l_sums + self.l_prods:
             leakage[dest.idx] += 1
             for op in ops:
                 leakage[op.idx] += 1
+        if only_inputs_leak:
+            leakage = [l if v.kind == 'input' else 0 for l, v in
+                    zip(leakage, self.vars)]
         return leakage
 
-    def to_lkm(self):
+    def to_lkm(self, rand_var_leak=1, only_inputs_leak=False):
         sc, var_map = self.simplified()
         is_cont = [v.continuous for v in sc.vars]
-        leakage = sc.var_leakage()
-        ops = ([(0, [v.idx for v in (dest, *ops)]) for dest, ops in sc.l_sums + sc.p_sums] +
-               [(1, [v.idx for v in (dest, *ops)]) for dest, ops in sc.l_prods + sc.p_prods])
+        leakage = sc.var_leakage(rand_var_leak, only_inputs_leak)
+        ops = ([(0, [v.idx for v in (dest, *ops)]) for dest, ops in
+                (sc.p_sums if only_inputs_leak else sc.l_sums + sc.p_sums)] +
+               [(1, [v.idx for v in (dest, *ops)]) for dest, ops in
+                (sc.p_sums if only_inputs_leak else sc.l_prods + sc.p_prods)])
         final_var_map = {self.fmt_var(v): var_map[v.idx] for v in self.vars}
         return (is_cont, leakage, ops), final_var_map
+
+    def nb_randoms(self):
+        return len([v for v in self.vars if v.kind == 'random'])
+
+    def nb_ops(self):
+        return len(self.l_sums) + len(self.l_prods)
+
+    def cost(self, cost_random, cost_op):
+        return self.nb_randoms()*cost_random + self.nb_ops()*cost_op
 
 
 class Variable:
@@ -166,5 +185,4 @@ class CompGraph:
             if var.kind == 'output'
             }
         return output_res, values
-            
 

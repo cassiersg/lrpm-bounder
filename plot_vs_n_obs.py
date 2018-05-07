@@ -15,17 +15,17 @@ def compute_target_mis(obs_mi, c, ns_obs, tol=1e-3, var_name='x'):
 
 circuit = 'isw'
 color_d = {2: 'g', 3: 'b', 4: 'r'}
-kind_mi = {1e-3: '.-', 1e-2: '-', 1e-1: '*-'}
+kind_mi = {1e-3: '.-', 1e-2: "-", 1e-1: '*-'}
 ns_obs = 2**np.arange(30)
 res = dict()
 for obs_mi in kind_mi.keys():
     for d in range(2, 4+1):
         c = muls_gen.muls[circuit](d)
         target_mis = np.array(compute_target_mis(obs_mi, c, ns_obs))
-        plt.loglog(ns_obs, target_mis, color_d[d]+kind_mi[obs_mi], label=f'{d} shares, {obs_mi} obs_mi')
+        plt.loglog(ns_obs, target_mis, color_d[d]+kind_mi[obs_mi], label=f'{d} shares {obs_mi} obs-mi')
 plt.xlabel('n_obs')
-plt.ylabel('target_mi')
+plt.ylabel('target-mi')
 plt.legend()
 plt.title(f'ISW')
-plt.show()
+#plt.show()
 
