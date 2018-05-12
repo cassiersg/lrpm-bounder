@@ -131,6 +131,20 @@ def barthe_ref(circuit, inputs, outputs=None, out_name=''):
     n_rounds = barthe_sni_n_rounds(len(inputs))
     return barthe_rd_ref(circuit, inputs, outputs, out_name, n_rounds)
 
+def empty_ref(circuit, inputs, outputs=None, out_name='sr'):
+    d = len(inputs)
+    if outputs is None:
+        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+    return outputs
+
+def bij_ref(circuit, inputs, outputs=None, out_name='sr'):
+    d = len(inputs)
+    if outputs is None:
+        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+    for i, o in zip(inputs, outputs):
+        circuit.bij(o, i)
+    return outputs
+
 
 refs = {
         'simple_ref': simple_ref,
@@ -139,6 +153,8 @@ refs = {
         'half_ref': half_ref,
         'half1_ref': half1_ref,
         'barthe_ref': barthe_ref,
+        'empty_ref': empty_ref,
+        'bij_ref': bij_ref,
         }
 
 def ref_generator(d, ref, io_sums=False):

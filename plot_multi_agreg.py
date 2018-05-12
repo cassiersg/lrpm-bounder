@@ -1,46 +1,23 @@
 
 import numpy as np
 from matplotlib import pyplot as plt
-import matplotlib2tikz
 
-import muls_gen
-import librfactor_python
-
-import obs_mi
+import utils_plot
 
 circuits = [
-        'bat2_bat_ref',
-        'bat2_bat_reft',
-        'pini6drbat',
-        'pini6drbatt',
+        'isw',
+        'isw_hp',
+        'isw_hpt',
+        #'isw_hpe',
+        #'isw_hpb',
+        #'isw_h',
+        #'isw_ht',
         ]
-color_circuit = {k: f'C{i}' for i, k in enumerate(circuits)}
 
-kind_d = {
-        #2: '.-',
-        #4: '+-',
-        #8: '*-',
-        16: '-',
-        #32: '+-',
-        }
+obs_mis = np.logspace(-2.5, -1.0, 100)
 
-obs_mis = np.logspace(-9, -1, 100)
+for circuit in circuits:
+    utils_plot.plot_line(circuit, obs_mis=obs_mis)
 
-for circuit in color_circuit.keys():
-    for d in kind_d.keys():
-        target_mis = obs_mi.compute_target_mis(obs_mis, circuit, d)
-        plt.loglog(
-                obs_mis,
-                target_mis,
-                color_circuit[circuit]+kind_d[d],
-                label=f'{d} shares {circuit.upper().replace("_", "-")}'
-                )
-
-plt.xlabel('obs-mi')
-plt.ylabel('target-mi')
-plt.legend()
-#plt.title(f'')
-fname = __file__.split('.')[0]
-matplotlib2tikz.save(f'../pini_mul/figs/{fname}.tex', figureheight='\\figureheight', figurewidth='\\figurewidth')
-plt.show()
-
+utils_plot.setup_plot()
+utils_plot.display()

@@ -12,6 +12,7 @@ class Circuit:
     def __init__(self):
         self.vars = []
         self.bijs = []
+        self.p_bijs = []
         self.l_sums = []
         self.p_sums = []
         self.l_prods = []
@@ -24,6 +25,9 @@ class Circuit:
 
     def bij(self, dest, op):
         self.bijs.append((dest, op))
+
+    def p_bij(self, dest, op):
+        self.p_bijs.append((dest, op))
 
     def l_sum(self, dest, ops):
         assert isinstance(dest, Variable) and all(isinstance(op, Variable) for op in ops)
@@ -61,21 +65,22 @@ class Circuit:
                 (self.fmt_op(dest, ops, '+', 'P') for dest, ops, in self.p_sums),
                 (self.fmt_op(dest, ops, '*', 'L') for dest, ops, in self.l_prods),
                 (self.fmt_op(dest, ops, '*', 'P') for dest, ops, in self.p_prods),
-                map(self.fmt_bij, self.bijs),
+                map(self.fmt_bij, self.bijs + self.p_bijs),
                 (self.fmt_cont(var) for var in self.vars if var.continuous),
                 ))
 
     def simplified(self):
         map_vars = list(range(len(self.vars)))
         rev_map_vars = list({x} for x in range(len(self.vars)))
-        for dest, op in self.bijs:
+        for dest, op in self.bijs + self.p_bijs:
             idxs = (map_vars[dest.idx], map_vars[op.idx])
             to_merge = max(idxs)
             merge_into = min(idxs)
-            for v in rev_map_vars[to_merge]:
-                map_vars[v] = merge_into
-            rev_map_vars[merge_into] |= rev_map_vars[to_merge]
-            rev_map_vars[to_merge] = None
+            if to_merge != merge_into:
+                for v in rev_map_vars[to_merge]:
+                    map_vars[v] = merge_into
+                rev_map_vars[merge_into] |= rev_map_vars[to_merge]
+                rev_map_vars[to_merge] = None
         rem_vars = [i for i, rv in enumerate(rev_map_vars) if rv is not None]
         nm = {v: i for i, v in enumerate(rem_vars)}
         final_map = [nm[mv] for mv in map_vars]

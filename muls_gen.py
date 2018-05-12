@@ -1,5 +1,6 @@
 
 import itertools as it
+import functools as ft
 import random
 
 import circuit_model
@@ -11,9 +12,7 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
     z = c.var(z_name, kind='output')
     c.bij(x, y)
     c.bij(x, z)
-    sh_x = []
-    sh_y = []
-    sh_z = []
+    sh_x, sh_y, sh_z = [], [], []
     for i in range(d):
         sh_x.append(c.var(f'{x_name}_{i}', kind='input'))
         sh_y.append(c.var(f'{y_name}_{i}', kind='input'))
@@ -28,45 +27,34 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
         c.p_sum(z, sh_z)
     return x, y, z, sh_x, sh_y, sh_z
 
-def pini_bat_mat_gen(c, in_x, in_y, ref=refs_gen.simple_ref, var_sums=None):
-    nx = len(in_x)
-    ny = len(in_y)
-    if nx == 1 and ny == 1:
-        return [[(in_x[0], in_y[0])]]
-    if nx == 1:
-        assert ny <= 2
-        return [[(in_x[0], iy) for iy in in_y]]
-    elif ny == 1:
-        assert nx <= 2
-        return [[(ix, in_y[0])] for ix in in_x]
-    else:
-        nx2 = nx//2
-        ny2 = ny//2
-        in_x1 = in_x[:nx2]
-        in_x2 = in_x[nx2:]
-        in_y1 = in_y[:ny2]
-        in_y2 = in_y[ny2:]
-        m11 = pini_bat_mat_gen(c, in_x1, in_y1, ref)
-        in_x1 = ref(c, in_x1)
-        in_y1 = ref(c, in_y1)
-        m12 = pini_bat_mat_gen(c, in_x1, in_y2, ref)
-        m21 = pini_bat_mat_gen(c, in_x2, in_y1, ref)
-        in_x2 = ref(c, in_x2)
-        in_y2 = ref(c, in_y2)
-        m22 = pini_bat_mat_gen(c, in_x2, in_y2, ref)
-        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
+def mat_prod(c, in_x, in_y, ref, var_sums, dr):
+    if ref is None:
+        return [[(ix, iy) for iy in in_y] for ix in in_x]
 
-def pini_bat_mat_gen_dr(c, in_x, in_y, ref=refs_gen.simple_ref, var_sums,
-        dr):
     nx = len(in_x)
     ny = len(in_y)
     if nx == 1 and ny == 1:
+        if var_sums is not None:
+            x_sum, y_sum = var_sums
+            # Redundant, already covered
+            #c.p_bij(in_x[0], x_sum)
+            #c.p_bij(in_y[0], y_sum)
         return [[(in_x[0], in_y[0])]]
     if nx == 1:
         assert ny <= 2
+        if var_sums is not None:
+            x_sum, y_sum = var_sums
+            # Redundant, already covered
+            #c.p_bij(in_x[0], x_sum)
+            c.p_sum(y_sum, in_y)
         return [[(in_x[0], iy) for iy in in_y]]
     elif ny == 1:
         assert nx <= 2
+        if var_sums is not None:
+            x_sum, y_sum = var_sums
+            # Redundant, already covered
+            #c.p_bij(in_y[0], y_sum)
+            c.p_sum(x_sum, in_x)
         return [[(ix, in_y[0])] for ix in in_x]
     else:
         nx2 = nx//2
@@ -87,6 +75,12 @@ def pini_bat_mat_gen_dr(c, in_x, in_y, ref=refs_gen.simple_ref, var_sums,
             c.p_sum(x_half2, in_x2)
             c.p_sum(y_half1, in_y1)
             c.p_sum(y_half2, in_y2)
+            sum11 = (x_half1, y_half1)
+            sum12 = (x_half1, y_half2)
+            sum21 = (x_half2, y_half1)
+            sum22 = (x_half2, y_half2)
+        else:
+            sum11 = sum12 = sum21 = sum22 = None
         if dr:
             in_x1_1 = ref(c, in_x1)
             in_y1_1 = ref(c, in_y1)
@@ -101,44 +95,12 @@ def pini_bat_mat_gen_dr(c, in_x, in_y, ref=refs_gen.simple_ref, var_sums,
         in_y1_2 = ref(c, in_y1)
         in_x2_2 = ref(c, in_x2)
         in_y2_2 = ref(c, in_y2)
-        m11 = pini_bat_mat_gen_dr(c, in_x1_1, in_y1_1, ref, var_sums, dr)
-        m12 = pini_bat_mat_gen_dr(c, in_x1_2, in_y2_1, ref, var_sums, dr)
-        m21 = pini_bat_mat_gen_dr(c, in_x2_1, in_y1_2, ref, var_sums, dr)
-        m22 = pini_bat_mat_gen_dr(c, in_x2_2, in_y2_2, ref, var_sums, dr)
-        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
-
-def isw(d):
-    c = circuit_model.Circuit()
-    _, _, _, x, y, z = mul_preamble(d, c)
-
-    # product matrix
-    p = [[c.var(f'p_{i}_{j}') for j in range(d)] for i in range(d)]
-    for i, j in it.product(range(d), range(d)):
-        c.l_prod(p[i][j], (x[i], y[j]))
-
-    # randoms & temps in matrix
-    r = [[0 if j <= i else c.var(f'r_{i}_{j}', kind='random') for j in
-        range(d)] for i in range(d)]
-    t = [[0 if j <= i else c.var(f't_{i}_{j}') for j in range(d)] for i in
-            range(d)]
-    m = [[c.var(f'm_{i}_{j}') for j in range(d)] for i in range(d)]
-    for i in range(d):
-        for j in range(i):
-            c.bij(m[i][j], r[j][i])
-        for j in range(i+1, d):
-            c.l_sum(t[i][j], (r[i][j], p[i][j]))
-            c.l_sum(m[i][j], (t[i][j], p[j][i]))
-
-    # compression
-    c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
-    for i in range(d):
-        c.bij(m[i][i], p[i][i])
-        c.bij(c_var[i][0], m[i][0])
-        for j in range(1, d):
-            c.l_sum(c_var[i][j], (c_var[i][j-1], m[i][j]))
-        c.bij(z[i], c_var[i][d-1])
-
-    return c
+        m11 = mat_prod(c, in_x1_1, in_y1_1, ref, sum11, dr)
+        m12 = mat_prod(c, in_x1_2, in_y2_1, ref, sum12, dr)
+        m21 = mat_prod(c, in_x2_1, in_y1_2, ref, sum21, dr)
+        m22 = mat_prod(c, in_x2_2, in_y2_2, ref, sum22, dr)
+        return ([o1+o2 for o1, o2 in zip(m11, m12)] +
+                [o1+o2 for o1, o2 in zip(m21, m22)])
 
 def BBP15(d):
     d2 = d-1
@@ -191,14 +153,88 @@ def BBP15(d):
 
     return c
 
+def pini2(d, mat_gen, tmp_sums):
+    d2 = d-1
+    c = circuit_model.Circuit()
+    sx, sy, sz, x, y, z = mul_preamble(d, c)
+
+    if tmp_sums:
+        var_sums = (sx, sy)
+    else:
+        var_sums = None
+    ref_prods = mat_gen(c, x, y, var_sums=var_sums)
+
+    # product matrix
+    s1 = [c.var(f's1_{i}', kind='random') for i in range(d)]
+    s = [{j: c.var(f's_{i}_{j}') for j in range(i+1, d)} for i in range(d)]
+    u = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(2)]
+        for j in range(i+1, d)} for i in range(d)]
+    p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
+        for j in range(i+1, d)} for i in range(d)]
+    for i in range(d):
+        for j in range(i+1, d):
+            c.l_sum(s[i][j], (s1[i], s1[j]))
+            xi, yj = ref_prods[i][j]
+            xj, yi = ref_prods[j][i]
+            c.l_sum(u[i][j][0], (yj, s[i][j]))
+            c.l_sum(u[i][j][1], (xj, s[i][j]))
+            c.l_prod(p[i][j][0], (xi, s[i][j]))
+            c.l_prod(p[i][j][1], (xi, u[i][j][0]))
+            c.l_prod(p[i][j][2], (yi, s[i][j]))
+            c.l_prod(p[i][j][3], (yi, u[i][j][1]))
+
+    # randoms & temps in matrix & compression
+    r = [
+            {d2-j: c.var(f'r_{i}_{j}', kind='random') for j in range(0, d2-i, 2)}
+            for i in range(d)
+            ]
+    r2 = {j: c.var(f'r2_{j}', kind='random') for j in range(d2-1, 0, -2)}
+    t = [
+            {j: [c.var(f't_{i}_{j}_{k}') for k in range(9)]
+                    for j in range(d2, i+1, -2)}
+            for i in range(d)
+            ]
+    c_var = [{j: c.var(f'c_{i}_{j}') for j in range(d2+2, i+1, -2)}
+            for i in range(d)
+            ]
+    for i in range(d):
+        pi = c.var(f'p_{i}_{i}')
+        c.l_prod(pi, ref_prods[i][i])
+        c.bij(c_var[i][d2+2], pi)
+        for j in range(d2, i+1, -2):
+            c.l_sum(t[i][j][0], (r[i][j], p[i][j][0]))
+            c.l_sum(t[i][j][1], (t[i][j][0], p[i][j][1]))
+            c.l_sum(t[i][j][2], (t[i][j][1], p[i][j][2]))
+            c.l_sum(t[i][j][3], (t[i][j][2], p[i][j][3]))
+            c.l_sum(t[i][j][4], (t[i][j][3], r2[j-1]))
+            c.l_sum(t[i][j][5], (t[i][j][4], p[i][j-1][0]))
+            c.l_sum(t[i][j][6], (t[i][j][5], p[i][j-1][1]))
+            c.l_sum(t[i][j][7], (t[i][j][6], p[i][j-1][2]))
+            c.l_sum(t[i][j][8], (t[i][j][7], p[i][j-1][3]))
+            c.l_sum(c_var[i][j], (c_var[i][j+2], t[i][j][8]))
+        if (i-d2) % 2 != 0:
+            t[i][i+1] = [c.var(f't_{i}_{i+1}_{k}') for k in range(4)]
+            c_var[i][i+1] = c.var(f'c_{i}_{i+1}')
+            c.l_sum(t[i][i+1][0], (r[i][i+1], p[i][i+1][0]))
+            c.l_sum(t[i][i+1][1], (t[i][i+1][0], p[i][i+1][1]))
+            c.l_sum(t[i][i+1][2], (t[i][i+1][1], p[i][i+1][2]))
+            c.l_sum(t[i][i+1][3], (t[i][i+1][2], p[i][i+1][3]))
+            c.l_sum(c_var[i][i+1], (c_var[i][i+3], t[i][i+1][3]))
+            if i % 2 == 1:
+                c.l_sum(z[i], (c_var[i][i+1], r2[i]))
+            else:
+                c.bij(z[i], c_var[i][i+1])
+        else:
+            for j in range(i-1, -1, -1):
+                c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
+                c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
+            c.bij(z[i], c_var[i][2])
+
+    return c
+
 def pini1(d):
     c = circuit_model.Circuit()
-    _, _, _, x, y, z = mul_preamble(d, c)
-
-    # not(x_i)
-    nx = [c.var(f'nx_{i}') for i in range(d)]
-    for i in range(d):
-        c.l_sum(nx[i], (x[i],))
+    sx, sy, sz, x, y, z = mul_preamble(d, c)
 
     # randoms & temps in matrix
     r = [{j: c.var(f'r_{i}_{j}', kind='random' if j < i else 'intermediate')
@@ -217,353 +253,12 @@ def pini1(d):
             for i in range(d)]
     for i in range(d):
         c.l_prod(t[i][i], (x[i], y[i]))
+        # not(x_i)
+        nxi = c.var(f'nxi_{i}_{j}')
+        c.l_sum(nxi, (x[i],))
         for j in range(d):
             if j != i:
-                c.l_sum(s[i][j], (y[j], r[i][j]))
-                c.l_prod(p[i][j][0], (nx[i], r[i][j]))
-                c.l_prod(p[i][j][1], (x[i], s[i][j]))
-                c.l_sum(t[i][j], (p[i][j][0], p[i][j][1]))
-
-    c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
-    for i in range(d):
-        c.bij(c_var[i][0], t[i][0])
-        for j in range(1, d):
-            c.l_sum(c_var[i][j], (c_var[i][j-1], t[i][j]))
-        c.bij(z[i], c_var[i][d-1])
-
-    return c
-
-def pini2(d):
-    d2 = d-1
-    c = circuit_model.Circuit()
-    _, _, _, x, y, z = mul_preamble(d, c)
-
-    # product matrix
-    s1 = [c.var(f's1_{i}', kind='random') for i in range(d)]
-    s = [{j: c.var(f's_{i}_{j}') for j in range(i+1, d)} for i in range(d)]
-    u = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(2)]
-        for j in range(i+1, d)} for i in range(d)]
-    p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
-        for j in range(i+1, d)} for i in range(d)]
-    for i in range(d):
-        for j in range(i+1, d):
-            c.l_sum(s[i][j], (s1[i], s1[j]))
-            c.l_sum(u[i][j][0], (y[j], s[i][j]))
-            c.l_sum(u[i][j][1], (x[j], s[i][j]))
-            c.l_prod(p[i][j][0], (x[i], s[i][j]))
-            c.l_prod(p[i][j][1], (x[i], u[i][j][0]))
-            c.l_prod(p[i][j][2], (y[i], s[i][j]))
-            c.l_prod(p[i][j][3], (y[i], u[i][j][1]))
-
-    # randoms & temps in matrix & compression
-    r = [
-            {d2-j: c.var(f'r_{i}_{j}', kind='random') for j in range(d2-i)}
-            for i in range(d)
-            ]
-    r2 = {j: c.var(f'r2_{j}', kind='random') for j in range(d2-1, 0, -2)}
-    t = [
-            {j: [c.var(f't_{i}_{j}_{k}') for k in range(9)]
-                    for j in range(d2, i+1, -2)}
-            for i in range(d)
-            ]
-    c_var = [{j: c.var(f'c_{i}_{j}') for j in range(d2+2, i+1, -2)}
-            for i in range(d)
-            ]
-    for i in range(d):
-        pi = c.var(f'p_{i}_{i}')
-        c.l_prod(pi, (x[i], y[i]))
-        c.bij(c_var[i][d2+2], pi)
-        for j in range(d2, i+1, -2):
-            c.l_sum(t[i][j][0], (r[i][j], p[i][j][0]))
-            c.l_sum(t[i][j][1], (t[i][j][0], p[i][j][1]))
-            c.l_sum(t[i][j][2], (t[i][j][1], p[i][j][2]))
-            c.l_sum(t[i][j][3], (t[i][j][2], p[i][j][3]))
-            c.l_sum(t[i][j][4], (t[i][j][3], r2[j-1]))
-            c.l_sum(t[i][j][5], (t[i][j][4], p[i][j-1][0]))
-            c.l_sum(t[i][j][6], (t[i][j][5], p[i][j-1][1]))
-            c.l_sum(t[i][j][7], (t[i][j][6], p[i][j-1][2]))
-            c.l_sum(t[i][j][8], (t[i][j][7], p[i][j-1][3]))
-            c.l_sum(c_var[i][j], (c_var[i][j+2], t[i][j][8]))
-        if (i-d2) % 2 != 0:
-            t[i][i+1] = [c.var(f't_{i}_{i+1}_{k}') for k in range(4)]
-            c_var[i][i+1] = c.var(f'c_{i}_{i+1}')
-            c.l_sum(t[i][i+1][0], (r[i][i+1], p[i][i+1][0]))
-            c.l_sum(t[i][i+1][1], (t[i][i+1][0], p[i][i+1][1]))
-            c.l_sum(t[i][i+1][2], (t[i][i+1][1], p[i][i+1][2]))
-            c.l_sum(t[i][i+1][3], (t[i][i+1][2], p[i][i+1][3]))
-            c.l_sum(c_var[i][i+1], (c_var[i][i+3], t[i][i+1][3]))
-            if i % 2 == 1:
-                c.l_sum(z[i], (c_var[i][i+1], r2[i]))
-            else:
-                c.bij(z[i], c_var[i][i+1])
-        else:
-            for j in range(i-1, -1, -1):
-                c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
-                c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.bij(z[i], c_var[i][2])
-
-    return c
-
-def pini3(d):
-    d2 = d-1
-    c = circuit_model.Circuit()
-    _, _, _, x, y, z = mul_preamble(d, c)
-
-    # product matrix
-    s1 = [c.var(f's1_{i}', kind='random') for i in range(d)]
-    xs = [c.var(f'xs_{i}') for i in range(d)]
-    ys = [c.var(f'xs_{i}') for i in range(d)]
-    for i in range(d):
-        c.l_sum(xs[i], (x[i], s1[i]))
-        c.l_sum(ys[i], (y[i], s1[i]))
-    s = [{j: c.var(f's_{i}_{j}') for j in range(i+1, d)} for i in range(d)]
-    u = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(2)]
-        for j in range(i+1, d)} for i in range(d)]
-    p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
-        for j in range(i+1, d)} for i in range(d)]
-    for i in range(d):
-        for j in range(i+1, d):
-            c.l_sum(s[i][j], (s1[i], s1[j]))
-            c.l_sum(u[i][j][0], (ys[j], s1[i]))
-            c.l_sum(u[i][j][1], (xs[j], s1[i]))
-            c.l_prod(p[i][j][0], (x[i], s[i][j]))
-            c.l_prod(p[i][j][1], (x[i], u[i][j][0]))
-            c.l_prod(p[i][j][2], (y[i], s[i][j]))
-            c.l_prod(p[i][j][3], (y[i], u[i][j][1]))
-
-    # randoms & temps in matrix & compression
-    r = [
-            {d2-j: c.var(f'r_{i}_{j}', kind='random') for j in range(0, d2-i, 2)}
-            for i in range(d)
-            ]
-    r2 = {j: c.var(f'r2_{j}', kind='random') for j in range(d2-1, 0, -2)}
-    t = [
-            {j: [c.var(f't_{i}_{j}_{k}') for k in range(9)]
-                    for j in range(d2, i+1, -2)}
-            for i in range(d)
-            ]
-    c_var = [{j: c.var(f'c_{i}_{j}') for j in range(d2+2, i+1, -2)}
-            for i in range(d)
-            ]
-    for i in range(d):
-        pi = c.var(f'p_{i}_{i}')
-        c.l_prod(pi, (x[i], y[i]))
-        c.bij(c_var[i][d2+2], pi)
-        for j in range(d2, i+1, -2):
-            c.l_sum(t[i][j][0], (r[i][j], p[i][j][0]))
-            c.l_sum(t[i][j][1], (t[i][j][0], p[i][j][1]))
-            c.l_sum(t[i][j][2], (t[i][j][1], p[i][j][2]))
-            c.l_sum(t[i][j][3], (t[i][j][2], p[i][j][3]))
-            c.l_sum(t[i][j][4], (t[i][j][3], r2[j-1]))
-            c.l_sum(t[i][j][5], (t[i][j][4], p[i][j-1][0]))
-            c.l_sum(t[i][j][6], (t[i][j][5], p[i][j-1][1]))
-            c.l_sum(t[i][j][7], (t[i][j][6], p[i][j-1][2]))
-            c.l_sum(t[i][j][8], (t[i][j][7], p[i][j-1][3]))
-            c.l_sum(c_var[i][j], (c_var[i][j+2], t[i][j][8]))
-        if (i-d2) % 2 != 0:
-            t[i][i+1] = [c.var(f't_{i}_{i+1}_{k}') for k in range(4)]
-            c_var[i][i+1] = c.var(f'c_{i}_{i+1}')
-            c.l_sum(t[i][i+1][0], (r[i][i+1], p[i][i+1][0]))
-            c.l_sum(t[i][i+1][1], (t[i][i+1][0], p[i][i+1][1]))
-            c.l_sum(t[i][i+1][2], (t[i][i+1][1], p[i][i+1][2]))
-            c.l_sum(t[i][i+1][3], (t[i][i+1][2], p[i][i+1][3]))
-            c.l_sum(c_var[i][i+1], (c_var[i][i+3], t[i][i+1][3]))
-            if i % 2 == 1:
-                c.l_sum(z[i], (c_var[i][i+1], r2[i]))
-            else:
-                c.bij(z[i], c_var[i][i+1])
-        else:
-            for j in range(i-1, -1, -1):
-                c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
-                c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.bij(z[i], c_var[i][2])
-
-    return c
-
-def pini4(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen):
-    d2 = d-1
-    c = circuit_model.Circuit()
-    _, _, _, x, y, z = mul_preamble(d, c)
-
-    # product matrix
-    s1 = [c.var(f's1_{i}', kind='random') for i in range(d)]
-    s = [{j: c.var(f's_{i}_{j}') for j in range(i+1, d)} for i in range(d)]
-    u = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(2)]
-        for j in range(i+1, d)} for i in range(d)]
-    p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
-        for j in range(i+1, d)} for i in range(d)]
-    ref_prods = mat_gen(c, x, y, ref=ref)
-    for i in range(d):
-        for j in range(i+1, d):
-            c.l_sum(s[i][j], (s1[i], s1[j]))
-            xi, yj = ref_prods[i][j]
-            xj, yi = ref_prods[j][i]
-            c.l_sum(u[i][j][0], (yj, s[i][j]))
-            c.l_sum(u[i][j][1], (xj, s[i][j]))
-            c.l_prod(p[i][j][0], (xi, s[i][j]))
-            c.l_prod(p[i][j][1], (xi, u[i][j][0]))
-            c.l_prod(p[i][j][2], (yi, s[i][j]))
-            c.l_prod(p[i][j][3], (yi, u[i][j][1]))
-
-    # randoms & temps in matrix & compression
-    r = [
-            {d2-j: c.var(f'r_{i}_{j}', kind='random') for j in range(d2-i)}
-            for i in range(d)
-            ]
-    r2 = {j: c.var(f'r2_{j}', kind='random') for j in range(d2-1, 0, -2)}
-    t = [
-            {j: [c.var(f't_{i}_{j}_{k}') for k in range(9)]
-                    for j in range(d2, i+1, -2)}
-            for i in range(d)
-            ]
-    c_var = [{j: c.var(f'c_{i}_{j}') for j in range(d2+2, i+1, -2)}
-            for i in range(d)
-            ]
-    for i in range(d):
-        pi = c.var(f'p_{i}_{i}')
-        c.l_prod(pi, ref_prods[i][i])
-        c.bij(c_var[i][d2+2], pi)
-        for j in range(d2, i+1, -2):
-            c.l_sum(t[i][j][0], (r[i][j], p[i][j][0]))
-            c.l_sum(t[i][j][1], (t[i][j][0], p[i][j][1]))
-            c.l_sum(t[i][j][2], (t[i][j][1], p[i][j][2]))
-            c.l_sum(t[i][j][3], (t[i][j][2], p[i][j][3]))
-            c.l_sum(t[i][j][4], (t[i][j][3], r2[j-1]))
-            c.l_sum(t[i][j][5], (t[i][j][4], p[i][j-1][0]))
-            c.l_sum(t[i][j][6], (t[i][j][5], p[i][j-1][1]))
-            c.l_sum(t[i][j][7], (t[i][j][6], p[i][j-1][2]))
-            c.l_sum(t[i][j][8], (t[i][j][7], p[i][j-1][3]))
-            c.l_sum(c_var[i][j], (c_var[i][j+2], t[i][j][8]))
-        if (i-d2) % 2 != 0:
-            t[i][i+1] = [c.var(f't_{i}_{i+1}_{k}') for k in range(4)]
-            c_var[i][i+1] = c.var(f'c_{i}_{i+1}')
-            c.l_sum(t[i][i+1][0], (r[i][i+1], p[i][i+1][0]))
-            c.l_sum(t[i][i+1][1], (t[i][i+1][0], p[i][i+1][1]))
-            c.l_sum(t[i][i+1][2], (t[i][i+1][1], p[i][i+1][2]))
-            c.l_sum(t[i][i+1][3], (t[i][i+1][2], p[i][i+1][3]))
-            c.l_sum(c_var[i][i+1], (c_var[i][i+3], t[i][i+1][3]))
-            if i % 2 == 1:
-                c.l_sum(z[i], (c_var[i][i+1], r2[i]))
-            else:
-                c.bij(z[i], c_var[i][i+1])
-        else:
-            for j in range(i-1, -1, -1):
-                c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
-                c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.bij(z[i], c_var[i][2])
-
-    return c
-
-def pini5(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False):
-    d2 = d-1
-    c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
-
-    # product matrix
-    s = [{j: c.var(f's_{i}_{j}', kind='random') for j in range(i+1, d)} for i in range(d)]
-    u = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(2)]
-        for j in range(i+1, d)} for i in range(d)]
-    p = [{j: [c.var(f's_{i}_{j}_{k}') for k in range(4)]
-        for j in range(i+1, d)} for i in range(d)]
-    if tmp_sums:
-        var_sums = (sx, sy)
-    else:
-        var_sums = None
-    ref_prods = mat_gen(c, x, y, ref=ref, var_sums=var_sums)
-    for i in range(d):
-        for j in range(i+1, d):
-            xi, yj = ref_prods[i][j]
-            xj, yi = ref_prods[j][i]
-            c.l_sum(u[i][j][0], (yj, s[i][j]))
-            c.l_sum(u[i][j][1], (xj, s[i][j]))
-            c.l_prod(p[i][j][0], (xi, s[i][j]))
-            c.l_prod(p[i][j][1], (xi, u[i][j][0]))
-            c.l_prod(p[i][j][2], (yi, s[i][j]))
-            c.l_prod(p[i][j][3], (yi, u[i][j][1]))
-
-    # randoms & temps in matrix & compression
-    r = [
-            {d2-j: c.var(f'r_{i}_{j}', kind='random') for j in range(d2-i)}
-            for i in range(d)
-            ]
-    r2 = {j: c.var(f'r2_{j}', kind='random') for j in range(d2-1, 0, -2)}
-    t = [
-            {j: [c.var(f't_{i}_{j}_{k}') for k in range(9)]
-                    for j in range(d2, i+1, -2)}
-            for i in range(d)
-            ]
-    c_var = [{j: c.var(f'c_{i}_{j}') for j in range(d2+2, i+1, -2)}
-            for i in range(d)
-            ]
-    for i in range(d):
-        pi = c.var(f'p_{i}_{i}')
-        c.l_prod(pi, ref_prods[i][i])
-        c.bij(c_var[i][d2+2], pi)
-        for j in range(d2, i+1, -2):
-            c.l_sum(t[i][j][0], (r[i][j], p[i][j][0]))
-            c.l_sum(t[i][j][1], (t[i][j][0], p[i][j][1]))
-            c.l_sum(t[i][j][2], (t[i][j][1], p[i][j][2]))
-            c.l_sum(t[i][j][3], (t[i][j][2], p[i][j][3]))
-            c.l_sum(t[i][j][4], (t[i][j][3], r2[j-1]))
-            c.l_sum(t[i][j][5], (t[i][j][4], p[i][j-1][0]))
-            c.l_sum(t[i][j][6], (t[i][j][5], p[i][j-1][1]))
-            c.l_sum(t[i][j][7], (t[i][j][6], p[i][j-1][2]))
-            c.l_sum(t[i][j][8], (t[i][j][7], p[i][j-1][3]))
-            c.l_sum(c_var[i][j], (c_var[i][j+2], t[i][j][8]))
-        if (i-d2) % 2 != 0:
-            t[i][i+1] = [c.var(f't_{i}_{i+1}_{k}') for k in range(4)]
-            c_var[i][i+1] = c.var(f'c_{i}_{i+1}')
-            c.l_sum(t[i][i+1][0], (r[i][i+1], p[i][i+1][0]))
-            c.l_sum(t[i][i+1][1], (t[i][i+1][0], p[i][i+1][1]))
-            c.l_sum(t[i][i+1][2], (t[i][i+1][1], p[i][i+1][2]))
-            c.l_sum(t[i][i+1][3], (t[i][i+1][2], p[i][i+1][3]))
-            c.l_sum(c_var[i][i+1], (c_var[i][i+3], t[i][i+1][3]))
-            if i % 2 == 1:
-                c.l_sum(z[i], (c_var[i][i+1], r2[i]))
-            else:
-                c.bij(z[i], c_var[i][i+1])
-        else:
-            for j in range(i-1, -1, -1):
-                c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
-                c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.bij(z[i], c_var[i][2])
-
-    return c
-
-def pini6(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False):
-    c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
-
-    if tmp_sums:
-        var_sums = (sx, sy)
-    else:
-        var_sums = None
-    ref_prods = mat_gen(c, x, y, ref=ref, var_sums=var_sums)
-
-
-    # randoms & temps in matrix
-    r = [{j: c.var(f'r_{i}_{j}', kind='random' if j < i else 'intermediate')
-        for j in range(d) if j != i}
-        for i in range(d)]
-    for i in range(d):
-        for j in range(i):
-            c.bij(r[j][i], r[i][j])
-
-    s = [{j: c.var(f's_{i}_{j}') for j in range(d) if j != i}
-            for i in range(d)]
-    p = [{j: [c.var(f'p_{i}_{j}_{k}') for k in range(2)]
-        for j in range(d) if j != i}
-        for i in range(d)]
-    t = [{j: c.var(f't_{i}_{j}') for j in range(d)}
-            for i in range(d)]
-    for i in range(d):
-        c.l_prod(t[i][i], ref_prods[i][i])
-        for j in range(d):
-            if j != i:
-                xi, yj = ref_prods[i][j]
-                # not(x_i)
-                nxi = c.var(f'nxi_{i}_{j}')
-                c.l_sum(nxi, (xi,))
+                xi, yj = x[i], y[j]
                 c.l_sum(s[i][j], (yj, r[i][j]))
                 c.l_prod(p[i][j][0], (nxi, r[i][j]))
                 c.l_prod(p[i][j][1], (xi, s[i][j]))
@@ -578,43 +273,56 @@ def pini6(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False):
 
     return c
 
-def bat_mat_mul(c, in_x, in_y, ref=refs_gen.simple_ref):
-    nx = len(in_x)
-    ny = len(in_y)
-    if nx == 1 and ny == 1:
-        out = c.var('')
-        c.l_prod(out, (in_x[0], in_y[0]))
-        return [[out]]
-    if nx == 1:
-        assert ny <= 2
-        outs = [c.var('') for _ in range(ny)]
-        for out, iy in zip(outs, in_y):
-            c.l_prod(out, (iy, in_x[0]))
-        return [outs]
-    elif ny == 1:
-        assert nx <= 2
-        outs = [c.var('') for _ in range(nx)]
-        for out, ix in zip(outs, in_x):
-            c.l_prod(out, (ix, in_y[0]))
-        return [[out] for out in outs]
-    else:
-        nx2 = nx//2
-        ny2 = ny//2
-        in_x1 = in_x[:nx2]
-        in_x2 = in_x[nx2:]
-        in_y1 = in_y[:ny2]
-        in_y2 = in_y[ny2:]
-        m11 = bat_mat_mul(c, in_x1, in_y1, ref)
-        in_x1 = ref(c, in_x1)
-        in_y1 = ref(c, in_y1)
-        m12 = bat_mat_mul(c, in_x1, in_y2, ref)
-        m21 = bat_mat_mul(c, in_x2, in_y1, ref)
-        in_x2 = ref(c, in_x2)
-        in_y2 = ref(c, in_y2)
-        m22 = bat_mat_mul(c, in_x2, in_y2, ref)
-        return [o1+o2 for o1, o2 in zip(m11, m12)] + [o1+o2 for o1, o2 in zip(m21, m22)]
+def pini3(d, mat_gen, tmp_sums):
+    c = circuit_model.Circuit()
+    sx, sy, sz, x, y, z = mul_preamble(d, c)
 
-def bat_mul(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False):
+    if tmp_sums:
+        var_sums = (sx, sy)
+    else:
+        var_sums = None
+    ref_prods = mat_gen(c, x, y, var_sums=var_sums)
+
+
+    # randoms & temps in matrix
+    r = [{j: c.var(f'r_{i}_{j}', kind='random' if j < i else 'intermediate')
+        for j in range(d) if j != i}
+        for i in range(d)]
+    for i in range(d):
+        for j in range(i):
+            c.bij(r[j][i], r[i][j])
+
+    s = [{j: c.var(f's_{i}_{j}') for j in range(d) if j != i}
+            for i in range(d)]
+    p = [{j: [c.var(f'p_{i}_{j}_{k}') for k in range(3)]
+        for j in range(d) if j != i}
+        for i in range(d)]
+    t = [{j: c.var(f't_{i}_{j}') for j in range(d)}
+            for i in range(d)]
+    for i in range(d):
+        c.l_prod(t[i][i], ref_prods[i][i])
+        for j in range(d):
+            if j != i:
+                xi, yj = ref_prods[i][j]
+                # not(x_i)
+                #nxi = c.var(f'nxi_{i}_{j}')
+                #c.l_sum(nxi, (xi,))
+                c.l_sum(s[i][j], (yj, r[i][j]))
+                c.l_prod(p[i][j][0], (xi, r[i][j]))
+                c.l_prod(p[i][j][1], (xi, s[i][j]))
+                c.l_sum(p[i][j][2], (p[i][j][0], r[i][j]))
+                c.l_sum(t[i][j], (p[i][j][2], p[i][j][1]))
+
+    c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
+    for i in range(d):
+        c.bij(c_var[i][0], t[i][0])
+        for j in range(1, d):
+            c.l_sum(c_var[i][j], (c_var[i][j-1], t[i][j]))
+        c.bij(z[i], c_var[i][d-1])
+
+    return c
+
+def bat_mul(d, mat_gen, tmp_sums):
     c = circuit_model.Circuit()
     sx, sy, sz, x, y, z = mul_preamble(d, c)
 
@@ -623,7 +331,7 @@ def bat_mul(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False
     else:
         var_sums = None
     # product matrix
-    ref_prods = mat_gen(c, x, y, ref=ref, var_sums=var_sums)
+    ref_prods = mat_gen(c, x, y, var_sums=var_sums)
 
     p = [[c.var(f's_{i}_{j}') for j in range(d)] for i in range(d)]
     for i in range(d):
@@ -651,7 +359,7 @@ def bat_mul(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False
 
     return c
 
-def fake_bat_mul(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=False):
+def fake_bat_mul(d, mat_gen):
     c = circuit_model.Circuit()
     sx, sy, sz, x, y, z = mul_preamble(d, c)
 
@@ -660,47 +368,49 @@ def fake_bat_mul(d, ref=refs_gen.simple_ref, mat_gen=pini_bat_mat_gen, tmp_sums=
     else:
         var_sums = None
     # product matrix
-    ref_prods = mat_gen(c, x, y, ref=ref, var_sums=var_sums)
+    ref_prods = mat_gen(c, x, y)
 
     return c
 
+mat_prod_0 = ft.partial(mat_prod,
+        ref=None, var_sums=None, dr=False)
+mat_prod_h = ft.partial(mat_prod,
+        ref=refs_gen.bat_ref, var_sums=None, dr=False)
+mat_prod_hs = ft.partial(mat_prod,
+        ref=refs_gen.simple_ref, var_sums=None, dr=False)
+mat_prod_hp = ft.partial(mat_prod,
+        ref=refs_gen.bat_ref, var_sums=None, dr=True)
+mat_prod_hps = ft.partial(mat_prod,
+        ref=refs_gen.simple_ref, var_sums=None, dr=True)
+mat_prod_hpe = ft.partial(mat_prod,
+        ref=refs_gen.empty_ref, var_sums=None, dr=True)
+mat_prod_hpb = ft.partial(mat_prod,
+        ref=refs_gen.bij_ref, var_sums=None, dr=True)
 
 muls = {
-        'ISW': isw,
-        'isw': isw,
-        'BBP15': BBP15,
+        'bbp15': BBP15,
+        'isw': ft.partial(bat_mul, mat_gen=mat_prod_0, tmp_sums=True),
+        'isw_h': ft.partial(bat_mul, mat_gen=mat_prod_h, tmp_sums=True),
+        'isw_hp': ft.partial(bat_mul, mat_gen=mat_prod_hp, tmp_sums=True),
+        'isw_hs': ft.partial(bat_mul, mat_gen=mat_prod_hs, tmp_sums=True),
+        'isw_hps': ft.partial(bat_mul, mat_gen=mat_prod_hps, tmp_sums=True),
+        #'isw_hpe': ft.partial(bat_mul, mat_gen=mat_prod_hpe, tmp_sums=True),
+        #'isw_hpb': ft.partial(bat_mul, mat_gen=mat_prod_hpb, tmp_sums=True),
+        'isw_ht': ft.partial(bat_mul, mat_gen=mat_prod_h, tmp_sums=False),
+        'isw_hpt': ft.partial(bat_mul, mat_gen=mat_prod_hp, tmp_sums=False),
         'pini1': pini1,
-        'pini2': pini2,
-        'pini3': pini3,
-        'pini4': pini4,
-        'pini5': pini5,
-        'pini4dr': lambda d: pini4(d, mat_gen=pini_bat_mat_gen_dr),
-        'pini5dr': lambda d: pini5(d, mat_gen=pini_bat_mat_gen_dr),
-        'pini5drt': lambda d: pini5(d, mat_gen=pini_bat_mat_gen_dr, tmp_sums=True),
-        'pini5drbat': lambda d: pini5(d, ref=refs_gen.bat_ref, mat_gen=pini_bat_mat_gen_dr),
-        'pini5bat': lambda d: pini5(d, ref=refs_gen.bat_ref),
-        'pini5h': lambda d: pini5(d, ref=refs_gen.half_ref),
-        'pini5hdr': lambda d: pini5(d, ref=refs_gen.half_ref, mat_gen=pini_bat_mat_gen_dr),
-        'pini5drbatt': lambda d: pini5(d, ref=refs_gen.bat_ref, mat_gen=pini_bat_mat_gen_dr, tmp_sums=True),
-        'pini6dr': lambda d: pini6(d, mat_gen=pini_bat_mat_gen_dr),
-        'pini6drt': lambda d: pini6(d, mat_gen=pini_bat_mat_gen_dr, tmp_sums=True),
-        'pini6drbat': lambda d: pini6(d, ref=refs_gen.bat_ref, mat_gen=pini_bat_mat_gen_dr),
-        'pini6bat': lambda d: pini6(d, ref=refs_gen.bat_ref),
-        'pini6h': lambda d: pini6(d, ref=refs_gen.half_ref),
-        'pini6hdr': lambda d: pini6(d, ref=refs_gen.half_ref, mat_gen=pini_bat_mat_gen_dr),
-        'pini6drbatt': lambda d: pini6(d, ref=refs_gen.bat_ref, mat_gen=pini_bat_mat_gen_dr, tmp_sums=True),
-        'bat_simple_ref': bat_mul,
-        'bat2_simple_ref': lambda d: bat_mul(d, mat_gen=pini_bat_mat_gen_dr),
-        'bat_isw_ref': lambda d: bat_mul(d, ref=refs_gen.isw_ref),
-        'bat2_isw_ref': lambda d: bat_mul(d, ref=refs_gen.isw_ref, mat_gen=pini_bat_mat_gen_dr),
-        'bat_bat_ref': lambda d: bat_mul(d, ref=refs_gen.bat_ref),
-        'bat_bat_reft': lambda d: bat_mul(d, ref=refs_gen.bat_ref, tmp_sums=True),
-        'bat2_bat_ref': lambda d: bat_mul(d, ref=refs_gen.bat_ref, mat_gen=pini_bat_mat_gen_dr),
-        'bat2_bat_reft': lambda d: bat_mul(d, ref=refs_gen.bat_ref,
-            mat_gen=pini_bat_mat_gen_dr, tmp_sums=True),
-        'bat_half_ref': lambda d: bat_mul(d, ref=refs_gen.half_ref),
-        'bat2_half_ref': lambda d: bat_mul(d, ref=refs_gen.half_ref, mat_gen=pini_bat_mat_gen_dr),
-        'bat_half1_ref': lambda d: bat_mul(d, ref=refs_gen.half1_ref),
+        'pini3': ft.partial(pini3, mat_gen=mat_prod_0, tmp_sums=True),
+        #'pini3_h': ft.partial(pini3, mat_gen=mat_prod_h, tmp_sums=True),
+        'pini3_hp': ft.partial(pini3, mat_gen=mat_prod_hp, tmp_sums=True),
+        #'pini3_hs': ft.partial(pini3, mat_gen=mat_prod_hs, tmp_sums=True),
+        'pini3_hps': ft.partial(pini3, mat_gen=mat_prod_hps, tmp_sums=True),
+        #'pini3_hpe': ft.partial(pini3, mat_gen=mat_prod_hpe, tmp_sums=True),
+        'pini3_hpt': ft.partial(pini3, mat_gen=mat_prod_hp, tmp_sums=False),
+        'pini2': ft.partial(pini2, mat_gen=mat_prod_0, tmp_sums=True),
+        #'pini2_h': ft.partial(pini2, mat_gen=mat_prod_h, tmp_sums=True),
+        'pini2_hp': ft.partial(pini2, mat_gen=mat_prod_hp, tmp_sums=True),
+        #'pini2_hs': ft.partial(pini2, mat_gen=mat_prod_hs, tmp_sums=True),
+        'pini2_hps': ft.partial(pini2, mat_gen=mat_prod_hps, tmp_sums=True),
         }
 
 import sys
@@ -718,7 +428,7 @@ def gen_random_inputs(d, domain=(0,1)):
 def assert_sh_prod(x, y, z):
     assert (sum(x) % 2) * (sum(y) % 2) == (sum(z) % 2)
 
-def test_mul(d, mul=isw):
+def test_mul(d, mul):
     c = mul(d)
     g = circuit_model.CompGraph(c)
     inputs, x, y = gen_random_inputs(d)

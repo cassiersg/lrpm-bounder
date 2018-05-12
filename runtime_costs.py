@@ -48,7 +48,7 @@ def cost_ni_mul(d, raw_costs=raw_costs):
         rc, oc = raw_costs
         return rc*rand + oc*op
     else:
-        return cost_mul(d, 'BBP15', raw_costs)
+        return cost_mul(d, 'bbp15', raw_costs)
 
 def cost_sni_ref(d, raw_costs=raw_costs):
     costs = [cost_ref(d, 'bat_ref', raw_costs)]
@@ -63,14 +63,14 @@ def cost_sni_mul(d, raw_costs=raw_costs):
             )
 
 def cost_pini1_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini1', raw_costs)
-def cost_pini2_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini3', raw_costs)
+def cost_pini2_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini2', raw_costs)
 
-def cost_pini_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini6drbat', raw_costs)
-def cost_pini_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini6dr', raw_costs)
+def cost_pini3_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini3_hp', raw_costs)
+def cost_pini3_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini3_hps', raw_costs)
 
-def cost_isw_h_mul(d, raw_costs=raw_costs): return cost_mul(d, 'bat_bat_ref', raw_costs)
-def cost_isw_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'bat2_bat_ref', raw_costs)
-def cost_isw_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'bat2_simple_ref', raw_costs)
+def cost_isw_h_mul(d, raw_costs=raw_costs): return cost_mul(d, 'isw_h', raw_costs)
+def cost_isw_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'isw_hp', raw_costs)
+def cost_isw_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'isw_hps', raw_costs)
 
 
 def cost_mul(d, name, raw_costs=raw_costs):

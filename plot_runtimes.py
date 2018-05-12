@@ -18,10 +18,10 @@
 """
 
 import numpy as np
-import matplotlib2tikz
 from matplotlib import pyplot as plt
 
 import runtime_costs
+import utils_plot
 
 ds = list(range(1, 32))
 x = [d+1 for d in ds]
@@ -38,9 +38,9 @@ for d in ds:
         c_isw_hp/cgreedy, c_isw_hps/cgreedy])
 y = np.array(y)
 plt.plot(x, y, '.-')
-plt.legend(['Greedy strategy', 'MIMO-SNI', 'PINI1', 'PINI2', 'MIMO ISW_H',
-    'MIMO ISW_HP', 'MIMO ISW_HPS'])
+plt.legend(['Greedy strategy', 'MIMO-SNI', 'PINI1', 'PINI2', 'MIMO ISW-H',
+    'MIMO ISW-HP', 'MIMO ISW-HPS'])
 plt.xlabel('Order $d$')
 plt.ylabel('Relative runtime cost')
-#matplotlib2tikz.save('../pini_mul/figs/runtime_cost_rel.tex', figureheight='\\figureheight', figurewidth='\\figurewidth')
-plt.show()
+utils_plot.display()
+
