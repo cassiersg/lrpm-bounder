@@ -28,15 +28,37 @@ n_indep_mul = n_mul - n_refresh_mul
 n_refresh_lb = 34
 
 
-def get_raw_costs(percent_op, percent_rand):
-    # rough approximations
-    rb = percent_rand/(32*32*(11+16))
-    op = percent_op/(32*(6*16+11*3))/32
+def get_raw_costs(rel_tot_op_time, rel_tot_rand_time):
+    # Circuit of Journault & Standaert 2017
+    # Barthe+ 2017 multiplication & reshresh gadgets, greedy strategy
+    nb_op_per_mul = 2*32**2
+    nb_rand_per_mul = 32**2/4
+    ref_circ = refs_gen.ref_generator(32, refs_gen.refs['barthe_ref'])
+    nb_op_per_ref = ref_circ.nb_ops()
+    nb_rand_per_ref = ref_circ.nb_randoms()
+    tot_op_sbox = n_mul * (nb_op_per_mul + nb_op_per_ref)
+    tot_rand_sbox = n_mul * (nb_rand_per_mul + nb_op_per_ref)
+    # time per op / per rand bit
+    rel_op_time = rel_tot_op_time / tot_op_sbox
+    rel_rand_time = rel_tot_rand_time / tot_rand_sbox
+    # normalization
+    norm_op_time = 1
+    norm_rand_time = rel_rand_time / rel_op_time * norm_op_time
+    op = norm_op_time
+    rb = norm_rand_time
+    #rb = percent_rand/(32*32*(11+16))
+    #op = percent_op/(32*(6*16+11*3))/32
     return rb, op
 
-raw_costs = get_raw_costs(7.23, 91.91)
-raw_costs = raw_costs[0], 0
+# actual runtime costs
+rel_tot_op_time = 0.0723
+rel_tot_rand_time = 0.9191
+# neglected since we are interested in ratio (and this is constant)
+rel_lin_time = 0.006
+
+raw_costs = get_raw_costs(rel_tot_op_time, rel_tot_rand_time)
 #raw_costs = get_raw_costs(25.16, 72.66)
+#raw_costs = raw_costs[0], 0
 
 
 def cost_ni_mul(d, raw_costs=raw_costs):

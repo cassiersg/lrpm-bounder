@@ -1,4 +1,5 @@
 
+import math
 import random
 
 import circuit_model
@@ -125,7 +126,9 @@ def barthe_sni_n_rounds(n_shares):
     elif n_shares in (5, 6, 7): return 2
     elif n_shares in (8, 9, 10): return 3
     elif n_shares == 11: return 4
-    else: raise ValueError('not SNI')
+    else:
+        return math.ceil((n_shares-1)/3) # only conjectured to be SNI
+        #raise ValueError('not SNI')
 
 def barthe_ref(circuit, inputs, outputs=None, out_name=''):
     n_rounds = barthe_sni_n_rounds(len(inputs))
