@@ -6,6 +6,7 @@ import utils_plot
 circuits = [
         'pini3_hp',
         'isw_hp',
+        'pinic_hp',
         ]
 
 kind_d = {

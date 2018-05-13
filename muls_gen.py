@@ -6,7 +6,7 @@ import random
 import circuit_model
 import refs_gen
 
-def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
+def mul_preamble(d, c, x_name='x', y_name='y', z_name='z', x_kind='input'):
     x = c.var(x_name, continuous=True, kind='output')
     y = c.var(y_name, kind='output')
     z = c.var(z_name, kind='output')
@@ -14,7 +14,7 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z'):
     c.bij(x, z)
     sh_x, sh_y, sh_z = [], [], []
     for i in range(d):
-        sh_x.append(c.var(f'{x_name}_{i}', kind='input'))
+        sh_x.append(c.var(f'{x_name}_{i}', kind=x_kind))
         sh_y.append(c.var(f'{y_name}_{i}', kind='input'))
         sh_z.append(c.var(f'{z_name}_{i}', kind='output'))
     if d == 1:
@@ -254,7 +254,7 @@ def pini1(d):
     for i in range(d):
         c.l_prod(t[i][i], (x[i], y[i]))
         # not(x_i)
-        nxi = c.var(f'nxi_{i}_{j}')
+        nxi = c.var(f'nxi_{i}')
         c.l_sum(nxi, (x[i],))
         for j in range(d):
             if j != i:
@@ -325,7 +325,23 @@ def pini3(d, mat_gen, tmp_sums):
 def bat_mul(d, mat_gen, tmp_sums):
     c = circuit_model.Circuit()
     sx, sy, sz, x, y, z = mul_preamble(d, c)
+    bat_mul_inner(d, mat_gen, tmp_sums, c, sx, sy, sz, x, y, z)
+    return c
 
+def pinic(d, mat_gen, tmp_sums):
+    c = circuit_model.Circuit()
+    x, y, z, shx, shy, shz = mul_preamble(
+            d, c, x_kind='intermediate', x_name='x2')
+    shx2 = [c.var(f'x_{i}', kind='input') for i in range(d)]
+    x2 = c.var('x')
+    c.bij(x2, x)
+    refs_gen.bat_ref(c, shx2, shx)
+    if tmp_sums:
+        c.p_sum(x, shx2)
+    bat_mul_inner(d, mat_gen, tmp_sums, c, x, y, z, shx, shy, shz)
+    return c
+
+def bat_mul_inner(d, mat_gen, tmp_sums, c, sx, sy, sz, x, y, z):
     if tmp_sums:
         var_sums = (sx, sy)
     else:
@@ -356,8 +372,6 @@ def bat_mul(d, mat_gen, tmp_sums):
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], s[i][j]))
         c.bij(z[i], c_var[i][d-1])
-
-    return c
 
 def fake_bat_mul(d, mat_gen):
     c = circuit_model.Circuit()
@@ -411,6 +425,9 @@ muls = {
         'pini2_hp': ft.partial(pini2, mat_gen=mat_prod_hp, tmp_sums=True),
         #'pini2_hs': ft.partial(pini2, mat_gen=mat_prod_hs, tmp_sums=True),
         'pini2_hps': ft.partial(pini2, mat_gen=mat_prod_hps, tmp_sums=True),
+        'pinic': ft.partial(pinic, mat_gen=mat_prod_0, tmp_sums=True),
+        'pinic_hp': ft.partial(pinic, mat_gen=mat_prod_hp, tmp_sums=True),
+        'pinic_hps': ft.partial(pinic, mat_gen=mat_prod_hps, tmp_sums=True),
         }
 
 import sys

@@ -25,21 +25,14 @@ import utils_plot
 
 ds = list(range(1, 32))
 x = [d+1 for d in ds]
-y = []
-for d in ds:
-    cmimo = runtime_costs.cost_mimo(d)
-    cgreedy = runtime_costs.cost_greedy(d)
-    cpini = runtime_costs.cost_pini1_sbox(d)
-    cpini2 = runtime_costs.cost_pini2_sbox(d)
-    c_isw_h = runtime_costs.cost_mimo_h(d, mul=runtime_costs.cost_isw_h_mul)
-    c_isw_hp = runtime_costs.cost_mimo_h(d, mul=runtime_costs.cost_isw_hp_mul)
-    c_isw_hps = runtime_costs.cost_mimo_h(d, mul=runtime_costs.cost_isw_hps_mul)
-    y.append([1, cmimo/cgreedy, cpini/cgreedy, cpini2/cgreedy, c_isw_h/cgreedy,
-        c_isw_hp/cgreedy, c_isw_hps/cgreedy])
-y = np.array(y)
+muls = ['isw', 'isw_h', 'isw_hp', 'isw_hps', 'pini1', 'pini2', 'pini3_hp',
+        'pini3_hps', 'pinic_hp', 'pinic_hps']
+costs = np.array(
+        [[runtime_costs.cost_mul(d, mul) for d in ds] for mul in muls]
+        )
+y = (costs / costs[0,:]).transpose()
 plt.plot(x, y, '.-')
-plt.legend(['Greedy strategy', 'MIMO-SNI', 'PINI1', 'PINI2', 'MIMO ISW-H',
-    'MIMO ISW-HP', 'MIMO ISW-HPS'])
+plt.legend([mul.upper().replace('_', '-') for mul in muls])
 plt.xlabel('Order $d$')
 plt.ylabel('Relative runtime cost')
 utils_plot.display()

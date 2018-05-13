@@ -183,7 +183,11 @@ class CompGraph:
                 values[var.idx] = random.choice(self.domain)
         for idx in nx.topological_sort(self.g):
             if values[idx] is None:
-                op = {'+': sum, '*': utils.product, '=': sum}[self.g.nodes[idx]['op']]
+                try:
+                    op = {'+': sum, '*': utils.product, '=': sum}[self.g.nodes[idx]['op']]
+                except KeyError:
+                    print('node:', self.circuit.fmt_var(self.circuit.vars[idx]))
+                    raise
                 values[idx] = op(values[pred] for pred in self.g.predecessors(idx))
         output_res = {
             var.idx: values[var.idx] for var in self.circuit.vars
