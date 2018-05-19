@@ -31,8 +31,8 @@ costs = np.array(
         [[runtime_costs.cost_mul(d, mul) for d in ds] for mul in muls]
         )
 y = (costs / costs[0,:]).transpose()
-plt.plot(x, y, '.-')
-plt.legend([mul.upper().replace('_', '-') for mul in muls])
+plt.plot(x, y, '.-', markersize=1)
+plt.legend([mul.replace('_', '-') for mul in muls])
 plt.xlabel('Order $d$')
 plt.ylabel('Relative runtime cost')
 utils_plot.display()

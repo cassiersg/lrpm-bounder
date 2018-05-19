@@ -36,10 +36,10 @@ def plot_line(circuit, d=None, color=None, kind='-', label=LABEL_SHARES_NAME,
     if label == LABEL_SHARES_NAME and d is None:
         label = LABEL_NAME
     if label == LABEL_SHARES_NAME:
-        label = f"{d} shares {circuit.upper().replace('_', '-')}"
+        label = f"{d} shares {circuit.replace('_', '-')}"
     elif label == LABEL_NAME and circuit not in seen_names:
         seen_names.add(circuit)
-        label = circuit.upper().replace('_', '-')
+        label = circuit.replace('_', '-')
     elif label == LABEL_SHARES and d not in seen_shares:
         seen_shares.add(d)
         label = f"{d} shares"

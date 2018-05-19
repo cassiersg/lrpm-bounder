@@ -34,7 +34,7 @@ costs = np.array(
         [[sb_c(d) for d in ds] for sb_n, sb_c in s_boxes]
         )
 y = (costs / costs[0,:]).transpose()
-plt.plot(x, y, '.-')
+plt.plot(x, y, '.-', markersize=1)
 plt.legend([sb_n for sb_n, sb_c in s_boxes])
 plt.xlabel('Order $d$')
 plt.ylabel('Relative runtime cost')

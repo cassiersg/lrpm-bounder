@@ -24,7 +24,7 @@ for d in kind_d.keys():
                 utils_plot.obs_mis,
                 target_mis,
                 f'C{i}'+'-.',
-                #label=f'{d} shares {circuit.upper().replace("_", "-")} LB'
+                #label=f'{d} shares {circuit.replace("_", "-")} LB'
                 )
         i += 1
 
