@@ -8,7 +8,7 @@ circuits = [
         'PINI1',
         'PINI2_H+',
         'PINI3_H+',
-        'SNI_H+',
+        #'SNI_H+',
         ]
 
 for circuit in circuits:
