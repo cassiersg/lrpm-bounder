@@ -5,9 +5,9 @@ import utils_plot
 import obs_mi
 
 circuits = [
-        'pini2',
-        'pini1',
-        'isw',
+        'PINI2',
+        'PINI1',
+        'SNI',
         ]
 
 for i, circuit in enumerate(circuits):

@@ -80,19 +80,19 @@ def cost_sni_ref(d, raw_costs=raw_costs):
 
 def cost_sni_mul(d, raw_costs=raw_costs):
     return min(
-            cost_mul(d, 'isw', raw_costs),
+            cost_mul(d, 'SNI', raw_costs),
             cost_ni_mul(d, raw_costs) + cost_sni_ref(d, raw_costs)
             )
 
-def cost_pini1_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini1', raw_costs)
-def cost_pini2_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini2', raw_costs)
+def cost_pini1_mul(d, raw_costs=raw_costs): return cost_mul(d, 'PINI1', raw_costs)
+def cost_pini2_mul(d, raw_costs=raw_costs): return cost_mul(d, 'PINI2', raw_costs)
 
-def cost_pini3_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini3_hp', raw_costs)
-def cost_pini3_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'pini3_hps', raw_costs)
+def cost_pini3_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'PINI3_H+', raw_costs)
+def cost_pini3_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'PINI3_H*', raw_costs)
 
-def cost_isw_h_mul(d, raw_costs=raw_costs): return cost_mul(d, 'isw_h', raw_costs)
-def cost_isw_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'isw_hp', raw_costs)
-def cost_isw_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'isw_hps', raw_costs)
+def cost_isw_h_mul(d, raw_costs=raw_costs): return cost_mul(d, 'SNI_H', raw_costs)
+def cost_isw_hp_mul(d, raw_costs=raw_costs): return cost_mul(d, 'SNI_H+', raw_costs)
+def cost_isw_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'SNI_H*', raw_costs)
 
 
 def cost_mul(d, name, raw_costs=raw_costs):

@@ -56,7 +56,7 @@ def plot_line(circuit, d=None, color=None, kind='-', label=LABEL_SHARES_NAME,
 
 def to_tikz():
     fname = sys.argv[0].split('.')[0]
-    matplotlib2tikz.save(f'../pini_mul/figs/{fname}.tex',
+    matplotlib2tikz.save(f'../SNI_opt_2/figs/{fname}.tex',
             figureheight='\\figureheight', figurewidth='\\figurewidth',
             externalize_tables=True, override_externals=True,
             tex_relative_path_to_data='figs')

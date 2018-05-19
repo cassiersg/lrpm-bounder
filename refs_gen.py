@@ -151,7 +151,7 @@ def bij_ref(circuit, inputs, outputs=None, out_name='sr'):
 
 refs = {
         'simple_ref': simple_ref,
-        'isw_ref': isw_ref,
+        'SNI_ref': isw_ref,
         'bat_ref': bat_ref,
         'half_ref': half_ref,
         'half1_ref': half1_ref,

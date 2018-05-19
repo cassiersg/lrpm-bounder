@@ -4,9 +4,9 @@ from matplotlib import pyplot as plt
 import utils_plot
 
 circuits = [
-        'pini3_hp',
-        'isw_hp',
-        'pinic_hp',
+        'PINI3_H+',
+        'SNI_H+',
+        'GreedyMult_H+',
         ]
 
 kind_d = {

@@ -4,11 +4,11 @@ from matplotlib import pyplot as plt
 import utils_plot
 
 circuits = [
-        #'isw',
-        'isw_h',
-        #'isw_ht',
-        'isw_hp',
-        #'isw_hpt',
+        #'SNI',
+        'SNI_H',
+        #'SNI_ht',
+        'SNI_H+',
+        #'SNI_H+ naive',
         ]
 
 kind_d = [

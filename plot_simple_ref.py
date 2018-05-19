@@ -4,10 +4,10 @@ from matplotlib import pyplot as plt
 import utils_plot
 
 circuits = [
-        'pini3_hps',
-        'pini3_hp',
-        'isw_hps',
-        'isw_hp',
+        'PINI3_H*',
+        'PINI3_H+',
+        'SNI_H*',
+        'SNI_H+',
         ]
 for circuit in circuits:
     utils_plot.plot_line(circuit)

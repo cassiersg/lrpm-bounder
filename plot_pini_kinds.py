@@ -4,11 +4,11 @@ from matplotlib import pyplot as plt
 import utils_plot
 
 circuits = [
-        'pini2',
-        'pini1',
-        'pini2_hp',
-        'pini3_hp',
-        'isw_hp',
+        'PINI2',
+        'PINI1',
+        'PINI2_H+',
+        'PINI3_H+',
+        'SNI_H+',
         ]
 
 for circuit in circuits:

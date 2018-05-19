@@ -5,8 +5,8 @@ import obs_mi
 import utils_plot
 
 circuits = [
-        'isw_h',
-        'isw',
+        'SNI_H',
+        'SNI',
         ]
 
 kind_d = {

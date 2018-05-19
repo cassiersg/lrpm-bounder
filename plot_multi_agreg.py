@@ -5,13 +5,13 @@ from matplotlib import pyplot as plt
 import utils_plot
 
 circuits = [
-        'isw',
-        'isw_hp',
-        'isw_hpt',
-        #'isw_hpe',
-        #'isw_hpb',
-        #'isw_h',
-        #'isw_ht',
+        'SNI',
+        'SNI_H+',
+        'SNI_H+ naive',
+        #'SNI_hpe',
+        #'SNI_hpb',
+        #'SNI_H',
+        #'SNI_ht',
         ]
 
 obs_mis = np.logspace(-2.5, -1.0, 100)
