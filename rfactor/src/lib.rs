@@ -19,7 +19,7 @@ py_class!(class PyFactorGraph |py| {
         _cls,
         vars_cont: Vec<bool>,
         vars_leakage: Vec<u32>,
-        ops: Vec<(u32, Vec<usize>)>
+        ops: Vec<(u32, usize, Vec<usize>)>
         ) -> PyResult<PyFactorGraph> {
         PyFactorGraph::create_instance(
             py,
@@ -34,16 +34,27 @@ py_class!(class PyFactorGraph |py| {
         precision: f64,
         alpha: f64,
         beta: f64,
-        max_iter: u32
+        max_iter: u32,
+        compat_old: bool
         ) -> PyResult<PyTuple> {
         let mut bp_state = self.graph(py).new_belief_state();
-        let n_iter = bp_state.run_belief_propagation(leakage, alpha, beta, n_cont, precision, max_iter);
+        let n_iter = bp_state.run_belief_propagation(
+            leakage, alpha, beta, n_cont, precision, max_iter, compat_old
+            );
         let res = (bp_state.mi_vars, n_iter);
         Ok(res.to_py_object(py))
     }
 });
 
-fn map_str_ops(ops: Vec<(u32, Vec<usize>)>) -> Vec<(OpKind, Vec<usize>)> {
-    ops.into_iter().map(|(op_kind, operands)| ((if op_kind == 0 {"+"} else {"*"}).parse().unwrap(), operands)).collect()
+fn map_str_ops(ops: Vec<(u32, usize, Vec<usize>)>)
+    -> Vec<(OpKind, usize, Vec<usize>)> {
+    ops
+        .into_iter()
+        .map(|(op_kind, op_res, operands)| (
+                (if op_kind == 0 {"+"} else {"*"}).parse().unwrap(),
+                op_res,
+                operands
+                ))
+        .collect()
 }
 

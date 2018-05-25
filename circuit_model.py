@@ -117,9 +117,9 @@ class Circuit:
         sc, var_map = self.simplified()
         is_cont = [v.continuous for v in sc.vars]
         leakage = sc.var_leakage(rand_var_leak, only_inputs_leak)
-        ops = ([(0, [v.idx for v in (dest, *ops)]) for dest, ops in
+        ops = ([(0, dest.idx, [v.idx for v in ops]) for dest, ops in
                 (sc.p_sums if only_inputs_leak else sc.l_sums + sc.p_sums)] +
-               [(1, [v.idx for v in (dest, *ops)]) for dest, ops in
+               [(1, dest.idx, [v.idx for v in ops]) for dest, ops in
                 (sc.p_sums if only_inputs_leak else sc.l_prods + sc.p_prods)])
         final_var_map = {self.fmt_var(v): var_map[v.idx] for v in self.vars}
         return (is_cont, leakage, ops), final_var_map

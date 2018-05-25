@@ -47,8 +47,8 @@ pub struct FactorGraph {
     pub vars_cont: Vec<bool>,
     /// Number of leakage points for each variable
     pub vars_leakage: Vec<u32>,
-    /// Operations: kind and operands (including result)
-    ops: Vec<(OpKind, Vec<usize>)>,
+    /// Operations: kind, result  and operands
+    ops: Vec<(OpKind, usize, Vec<usize>)>,
     /// Number of operations linked to each variable
     nb_ops_var: Vec<usize>,
     /// For each op, and for each operand, the id for the operation
@@ -56,7 +56,7 @@ pub struct FactorGraph {
     /// The relative op ids unique for a given variable, but not globally
     /// the are assigned in sequential order. This allows the belief
     /// propagation to write the propagated output correctly to each variable.
-    operands_op_ids: Vec<Vec<usize>>,
+    operands_op_ids: Vec<(usize, Vec<usize>)>,
 }
 
 #[derive(Debug)]
@@ -77,23 +77,30 @@ impl FactorGraph {
         }
     }
 
-    pub fn from_vars_and_ops(vars_cont: Vec<bool>, vars_leakage: Vec<u32>, ops: Vec<(OpKind, Vec<usize>)>) -> FactorGraph {
+    pub fn from_vars_and_ops(
+        vars_cont: Vec<bool>,
+        vars_leakage: Vec<u32>,
+        ops: Vec<(OpKind, usize, Vec<usize>)>,
+        ) -> FactorGraph {
         assert_eq!(vars_cont.len(), vars_leakage.len());
         let n = vars_cont.len();
-        for &(_, ref operands) in ops.iter() {
+        for &(_, ref res, ref operands) in ops.iter() {
+            assert!(*res < n);
             for operand in operands.iter() {
                 assert!(*operand < n);
             }
         }
         let mut nb_ops_var: Vec<usize> = iter::repeat(0).take(n).collect();
         let mut operands_op_ids = Vec::with_capacity(ops.len());
-        for &(_, ref operands) in ops.iter() {
+        for &(_, ref res, ref operands) in ops.iter() {
             let mut ids = Vec::with_capacity(operands.len());
+            let id_res = nb_ops_var[*res];
+            nb_ops_var[*res] += 1;
             for operand in operands.iter() {
                 ids.push(nb_ops_var[*operand]);
                 nb_ops_var[*operand] += 1;
             }
-            operands_op_ids.push(ids);
+            operands_op_ids.push((id_res, ids));
         }
         return FactorGraph {
             vars_cont,
@@ -120,12 +127,16 @@ impl FactorGraph {
             .collect();
         return BeliefState { mi_vars, mi_edges_to_vars, factor_graph: self };
     }
+
+    pub fn n_vars(&self) -> usize {
+        self.vars_cont.len()
+    }
 }
 
 impl<'a> BeliefState<'a> {
     fn compute_vars_sums(&mut self, mi_leak: f64, n: u64) -> f64 {
         let mut max_rel_delta = 0.0;
-        for var in 0..self.factor_graph.vars_cont.len() {
+        for var in 0..self.factor_graph.n_vars() {
             let intrinsic_leakage =
                 mi_leak * (self.factor_graph.vars_leakage[var] as f64);
             let extrinsic_leakage: f64 = self.mi_edges_to_vars[var].iter().sum();
@@ -149,14 +160,16 @@ impl<'a> BeliefState<'a> {
         }
     }
 
-    fn compute_ops_products(&mut self, alpha: f64, beta: f64) {
+    fn compute_ops_products(&mut self, alpha: f64, beta: f64, compat_old: bool) {
         for op in 0..self.factor_graph.ops.len() {
-            let operands = &self.factor_graph.ops[op].1;
-            let loss_factor = match self.factor_graph.ops[op].0 {
+            let &(ref op_kind, ref op_res, ref operands) =
+                &self.factor_graph.ops[op];
+            let loss_factor = match *op_kind {
                 OpKind::Sum => alpha,
                 OpKind::Product => beta,
-            }.powi((operands.len() - 2) as i32);
-            let operands_op_id = &self.factor_graph.operands_op_ids[op];
+            }.powi((operands.len() - 1) as i32);
+            let &(ref res_op_id, ref operands_op_id) =
+                &self.factor_graph.operands_op_ids[op];
             let mut new_msgs = Vec::with_capacity(operands.len());
             for dst_operand in operands.iter() {
                 let new_msg: f64 = operands
@@ -169,9 +182,37 @@ impl<'a> BeliefState<'a> {
                         let own_mi = self.mi_edges_to_vars[*operand][operand_op_id];
                         f64::min(1.0, full_mi - own_mi)
                     })
+                    .chain(iter::once({
+                        let full_mi = self.mi_vars[*op_res];
+                        let own_mi = self.mi_edges_to_vars[*op_res][*res_op_id];
+                        f64::min(1.0, full_mi - own_mi)
+                    }))
                     .product();
                 new_msgs.push(loss_factor * new_msg);
             }
+            let new_msg = {
+                let new_msg_iter = operands
+                    .iter()
+                    .enumerate()
+                    .map(|(i, operand)| {
+                        let full_mi = self.mi_vars[*operand];
+                        let operand_op_id = operands_op_id[i];
+                        let own_mi = self.mi_edges_to_vars[*operand][operand_op_id];
+                        f64::min(1.0, full_mi - own_mi)
+                    });
+                if compat_old || *op_kind == OpKind::Sum {
+                    let p: f64 = new_msg_iter.product();
+                    p * loss_factor
+                } else {
+                    assert_eq!(operands.len(), 2); // Otherwise formula is not correct
+                    let s: f64 = new_msg_iter.sum();
+                    s / (operands.len() as f64) * loss_factor
+                }
+            };
+            assert!(self.mi_edges_to_vars[*op_res][*res_op_id] <=
+                    new_msg + INCR_TOL);
+            self.mi_edges_to_vars[*op_res][*res_op_id] = new_msg;
+
             for ((i, dst_operand), new_msg) in
                 operands.iter().enumerate().zip(new_msgs.iter()) {
                 let old_msg = self.mi_edges_to_vars[*dst_operand][operands_op_id[i]];
@@ -191,7 +232,8 @@ impl<'a> BeliefState<'a> {
         beta: f64,
         n: u64,
         mi_tol: f64,
-        max_iter: u32
+        max_iter: u32,
+        compat_old: bool,
         ) -> u32 {
         let mut max_rel_delta = 0.0;
         for i in 0..max_iter {
@@ -200,7 +242,7 @@ impl<'a> BeliefState<'a> {
                 self.clip_vars_mi();
                 return i;
             }
-            self.compute_ops_products(alpha, beta);
+            self.compute_ops_products(alpha, beta, compat_old);
         }
         panic!("Max iteration count exceeded. max_rel_delta: {}\n {:#?}",
                max_rel_delta, &self.mi_vars);
