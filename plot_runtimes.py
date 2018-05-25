@@ -25,12 +25,23 @@ import utils_plot
 
 ds = list(range(1, 32))
 x = [d+1 for d in ds]
-muls = ['SNI', 'SNI_H', 'SNI_H+', 'SNI_H*', 'PINI1', 'PINI2', 'PINI3_H+',
-        'PINI3_H*', 'GreedyMult_H+', 'GreedyMult_H*']
+muls = [
+        #'SNI',
+        'SNI_H',
+        'SNI_H+',
+        'SNI_H*',
+        #'PINI1',
+        #'PINI2',
+        'PINI3_H+',
+        'PINI3_H*',
+        'GreedyMult_H+',
+        'GreedyMult_H*',
+        ]
 costs = np.array(
         [[runtime_costs.cost_mul(d, mul) for d in ds] for mul in muls]
         )
-y = (costs / costs[0,:]).transpose()
+base_costs = np.array([runtime_costs.cost_mul(d, 'SNI') for d in ds])
+y = (costs / base_costs).transpose()
 plt.plot(x, y, '.-', markersize=1)
 plt.legend([mul.replace('_', '-') for mul in muls])
 plt.xlabel('Order $d$')
