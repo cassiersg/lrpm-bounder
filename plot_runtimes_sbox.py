@@ -26,16 +26,16 @@ import utils_plot
 ds = list(range(1, 32))
 x = [d+1 for d in ds]
 s_boxes = [
-        ('MIMO-SNI', runtime_costs.cost_mimo),
-        ('PINI1', runtime_costs.cost_pini1_sbox),
-        ('PINI2', runtime_costs.cost_pini2_sbox),
+        (r'\textsf{MIMO-SNI}', runtime_costs.cost_mimo),
+        (r'\pinia, TPC', runtime_costs.cost_pini1_sbox),
+        (r'\pinib', runtime_costs.cost_pini2_sbox),
         ]
 costs = np.array(
-        [[sb_c(d) for d in ds] for sb_n, sb_c in s_boxes]
+        [[sb_c(d) for d in ds] for _, sb_c in s_boxes]
         )
 y = (costs / costs[0,:]).transpose()
 plt.plot(x, y, '.-', markersize=1)
-plt.legend([sb_n for sb_n, sb_c in s_boxes])
+plt.legend([sb_n for sb_n, _ in s_boxes])
 plt.xlabel('Order $d$')
 plt.ylabel('Relative runtime cost')
 utils_plot.display()

@@ -25,6 +25,28 @@ def setup_plot():
     plt.legend()
     #plt.title(f'')
 
+circ_names_map = {
+        'SNI': r'\sni',
+        'SNI_H': r'\snih',
+        'SNI_H+': r'\snihp',
+        'SNI_H*': r'\snihs',
+        'SNI_H+ naive': r'\snihp naive',
+        'PINI1': r'\pinia',
+        'PINI2': r'\pinib',
+        'PINI2_H': r'\pinibh',
+        'PINI2_H+': r'\pinibhp',
+        'PINI3': r'\pinic',
+        'PINI3_H': r'\pinich',
+        'PINI3_H+': r'\pinichp',
+        'PINI3_H*': r'\pinichs',
+        'GreedyMult': r'\greedymult',
+        'GreedyMult_H': r'\greedymulth',
+        'GreedyMult_H+': r'\greedymulthp',
+        'GreedyMult_H*': r'\greedymulths',
+        }
+def map_circ_name(circuit):
+    return circ_names_map.get(circuit, circuit)
+
 n_plots = 0
 seen_names = set()
 seen_shares = set()
@@ -36,10 +58,10 @@ def plot_line(circuit, d=None, color=None, kind='-', label=LABEL_SHARES_NAME,
     if label == LABEL_SHARES_NAME and d is None:
         label = LABEL_NAME
     if label == LABEL_SHARES_NAME:
-        label = f"{d} shares {circuit.replace('_', '-')}"
+        label = f"{d} shares {map_circ_name(circuit)}"
     elif label == LABEL_NAME and circuit not in seen_names:
         seen_names.add(circuit)
-        label = circuit.replace('_', '-')
+        label = map_circ_name(circuit)
     elif label == LABEL_SHARES and d not in seen_shares:
         seen_shares.add(d)
         label = f"{d} shares"

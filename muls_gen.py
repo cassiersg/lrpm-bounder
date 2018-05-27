@@ -414,7 +414,7 @@ muls = {
         'SNI_H+ naive': ft.partial(bat_mul, mat_gen=mat_prod_hp, tmp_sums=False),
         'PINI1': pini1,
         'PINI3': ft.partial(pini3, mat_gen=mat_prod_0, tmp_sums=True),
-        #'PINI3_H': ft.partial(pini3, mat_gen=mat_prod_h, tmp_sums=True),
+        'PINI3_H': ft.partial(pini3, mat_gen=mat_prod_h, tmp_sums=True),
         'PINI3_H+': ft.partial(pini3, mat_gen=mat_prod_hp, tmp_sums=True),
         #'PINI3_hs': ft.partial(pini3, mat_gen=mat_prod_hs, tmp_sums=True),
         'PINI3_H*': ft.partial(pini3, mat_gen=mat_prod_hps, tmp_sums=True),
@@ -426,6 +426,7 @@ muls = {
         #'PINI2_hs': ft.partial(pini2, mat_gen=mat_prod_hs, tmp_sums=True),
         'PINI2_H*': ft.partial(pini2, mat_gen=mat_prod_hps, tmp_sums=True),
         'GreedyMult': ft.partial(pinic, mat_gen=mat_prod_0, tmp_sums=True),
+        'GreedyMult_H': ft.partial(pinic, mat_gen=mat_prod_h, tmp_sums=True),
         'GreedyMult_H+': ft.partial(pinic, mat_gen=mat_prod_hp, tmp_sums=True),
         'GreedyMult_H*': ft.partial(pinic, mat_gen=mat_prod_hps, tmp_sums=True),
         }

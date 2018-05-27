@@ -26,24 +26,28 @@ import utils_plot
 ds = list(range(1, 32))
 x = [d+1 for d in ds]
 muls = [
-        #'SNI',
-        'SNI_H',
-        'SNI_H+',
-        'SNI_H*',
-        #'PINI1',
-        #'PINI2',
-        'PINI3_H+',
-        'PINI3_H*',
-        'GreedyMult_H+',
-        'GreedyMult_H*',
+        ('SNI', 'C0.-'),
+        ('PINI1', 'C1.-'),
+        ('GreedyMult', 'C2.-'),
+        ('SNI_H', 'C0x-'),
+        ('PINI3_H', 'C1x-'),
+        ('GreedyMult_H', 'C2x-'),
+        ('SNI_H*', 'C0v-'),
+        ('PINI3_H*', 'C1v-'),
+        ('GreedyMult_H*', 'C2v-'),
+        ('SNI_H+', 'C0^-'),
+        ('PINI3_H+', 'C1^-'),
+        ('GreedyMult_H+', 'C2^-'),
+        ('PINI2', 'C3.-'),
         ]
 costs = np.array(
-        [[runtime_costs.cost_mul(d, mul) for d in ds] for mul in muls]
+        [[runtime_costs.cost_mul(d, mul) for d in ds] for mul, _ in muls]
         )
 base_costs = np.array([runtime_costs.cost_mul(d, 'SNI') for d in ds])
-y = (costs / base_costs).transpose()
-plt.plot(x, y, '.-', markersize=1)
-plt.legend([mul.replace('_', '-') for mul in muls])
+y = costs / base_costs
+for i, (_, markinfo) in enumerate(muls):
+    plt.plot(x, y[i,:], markinfo, markersize=2)
+plt.legend([utils_plot.map_circ_name(mul) for mul, _ in muls])
 plt.xlabel('Order $d$')
 plt.ylabel('Relative runtime cost')
 utils_plot.display()

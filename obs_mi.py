@@ -25,7 +25,7 @@ def compute_target_mis2(obs_mis, circuit, tol=1e-5, var_name='x'):
     v = c.fmt_var([var for var in c.vars if var.name == var_name][0])
     x_idx = var_map[v]
     pfg = librfactor_python.PyFactorGraph(*abs_c_idx)
-    return [pfg.bp_mi(obs_mi, 1, tol, 1.0, 1.0, 10000)[0][x_idx]
+    return [pfg.bp_mi(obs_mi, 1, tol, 1.0, 1.0, 10000, False)[0][x_idx]
             for obs_mi in obs_mis]
 
 @mem.cache
@@ -55,5 +55,5 @@ def lb2_mi(obs_mis, c_name,  d, tol=1e-5, var_name='x'):
     v = c.fmt_var([var for var in c.vars if var.name == var_name][0])
     x_idx = var_map[v]
     pfg = librfactor_python.PyFactorGraph(*abs_c_idx)
-    return [pfg.bp_mi(obs_mi, 1, tol, 1.0, 1.0, 10000)[0][x_idx]
+    return [pfg.bp_mi(obs_mi, 1, tol, 1.0, 1.0, 10000, True)[0][x_idx]
             for obs_mi in obs_mis]
