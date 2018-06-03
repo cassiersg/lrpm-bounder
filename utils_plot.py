@@ -1,3 +1,16 @@
+# Copyright 2018 Gaëtan Cassiers
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -77,13 +90,16 @@ def plot_line(circuit, d=None, color=None, kind='-', label=LABEL_SHARES_NAME,
 
 
 def to_tikz():
-    fname = sys.argv[0].split('.')[0]
-    matplotlib2tikz.save(f'../SNI_opt_2/figs/{fname}.tex',
-            figureheight='\\figureheight', figurewidth='\\figurewidth',
-            externalize_tables=True, override_externals=True,
-            tex_relative_path_to_data='figs')
+    try:
+        fname = sys.argv[0].split('.')[0]
+        matplotlib2tikz.save(f'../SNI_opt_2/figs/{fname}.tex',
+                figureheight='\\figureheight', figurewidth='\\figurewidth',
+                externalize_tables=True, override_externals=True,
+                tex_relative_path_to_data='figs')
+    except Exception as e:
+        print('Could not export plot into tikz format', e)
 
 def display():
     to_tikz()
-    #plt.show()
+    plt.show()
 
