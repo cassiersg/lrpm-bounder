@@ -24,7 +24,7 @@ def simple_ref(circuit, inputs, outputs=None, out_name='sr'):
     c = circuit
     r = [c.var(f'r_{i}', kind='random') for i in range(d-1)]
     if d == 1:
-        c.bij(outputs[0], inputs[0])
+        c.assign(outputs[0], inputs[0])
     elif d == 2:
         c.l_sum(outputs[0], (inputs[0], r[0]))
         c.l_sum(outputs[1], (inputs[1], r[0]))
@@ -45,8 +45,8 @@ def isw_ref(circuit, inputs, outputs=None, out_name=''):
     c = [[circuit.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
     r = [{j: circuit.var(f'r_{i}_{j}', kind='random') for j in range(i)} for i in range(d)]
     for i in range(d):
-        circuit.bij(c[i][0], inputs[i])
-        circuit.bij(outputs[i], c[i][d-1])
+        circuit.assign(c[i][0], inputs[i])
+        circuit.assign(outputs[i], c[i][d-1])
     for i in range(d):
         for j in range(i):
             circuit.l_sum(c[i][j+1], (c[i][j], r[i][j]))
@@ -60,14 +60,14 @@ def bat_ref_layer(circuit, inputs, outputs, d, d2):
         circuit.l_sum(outputs[i], (inputs[i], r[i]))
         circuit.l_sum(outputs[d2+i], (inputs[d2+i], r[i]))
     if d % 2 == 1:
-        circuit.bij(outputs[d-1], inputs[d-1])
+        circuit.assign(outputs[d-1], inputs[d-1])
 
 def bat_ref(circuit, inputs, outputs=None, out_name=''):
     d = len(inputs)
     if outputs is None:
-        outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
+        outputs = [circuit.var(f'batref_{out_name}_{i}') for i in range(d)]
     if d == 1:
-        circuit.bij(outputs[0], inputs[0])
+        circuit.assign(outputs[0], inputs[0])
     elif d == 2:
         r = circuit.var('r', kind='random')
         circuit.l_sum(outputs[0], (inputs[0], r))
@@ -87,7 +87,7 @@ def half_ref(circuit, inputs, outputs=None, out_name=''):
     if outputs is None:
         outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
     if d == 1:
-        circuit.bij(outputs[0], inputs[0])
+        circuit.assign(outputs[0], inputs[0])
     else:
         d2 = d//2
         bat_ref_layer(circuit, inputs, outputs, d, d2)
@@ -98,7 +98,7 @@ def half1_ref(circuit, inputs, outputs=None, out_name=''):
     if outputs is None:
         outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
     if d == 1:
-        circuit.bij(outputs[0], inputs[0])
+        circuit.assign(outputs[0], inputs[0])
     else:
         d2 = d//2
         if d % 2 == 1:
@@ -118,7 +118,7 @@ def rot_ref(circuit, inputs, outputs=None, out_name=''):
     if outputs is None:
         outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
     if d == 1:
-        circuit.bij(outputs[0], inputs[0])
+        circuit.assign(outputs[0], inputs[0])
     else:
         randoms = [circuit.var(f'r_{i}', kind='random') for i in range(d)]
         temps = [circuit.var(f'temp_{i}') for i in range(d)]
@@ -158,7 +158,7 @@ def bij_ref(circuit, inputs, outputs=None, out_name='sr'):
     if outputs is None:
         outputs = [circuit.var(f'{out_name}_{i}') for i in range(d)]
     for i, o in zip(inputs, outputs):
-        circuit.bij(o, i)
+        circuit.assign(o, i)
     return outputs
 
 

@@ -20,18 +20,18 @@ import circuit_model
 import refs_gen
 
 def mul_preamble(d, c, strong_bij, x_name='x', y_name='y', z_name='z', x_kind='input'):
-    x = c.var(x_name, continuous=True, kind='output')
-    y = c.var(y_name, kind='output')
-    z = c.var(z_name, kind='output')
+    x = c.var(x_name, continuous=True, kind='property')
+    y = c.var(y_name, kind='property')
+    z = c.var(z_name, kind='property')
     sh_x, sh_y, sh_z = [], [], []
     for i in range(d):
         sh_x.append(c.var(f'{x_name}_{i}', kind=x_kind))
         sh_y.append(c.var(f'{y_name}_{i}', kind='input'))
         sh_z.append(c.var(f'{z_name}_{i}', kind='output'))
     if d == 1:
-        c.bij(x, sh_x[0])
-        c.bij(y, sh_y[0])
-        c.bij(z, sh_z[0])
+        c.bij(sh_x[0], x)
+        c.bij(sh_y[0], y)
+        c.bij(sh_z[0], z)
     else:
         c.p_sum(x, sh_x)
         c.p_sum(y, sh_y)
@@ -82,10 +82,10 @@ def mat_prod(c, in_x, in_y, ref, var_sums, dr):
         in_y2 = in_y[ny2:]
         if var_sums is not None:
             x_sum, y_sum = var_sums
-            x_half1 = c.var('tmp_sum_x1')
-            x_half2 = c.var('tmp_sum_x2')
-            y_half1 = c.var('tmp_sum_y1')
-            y_half2 = c.var('tmp_sum_y2')
+            x_half1 = c.var('tmp_sum_x1', kind='property')
+            x_half2 = c.var('tmp_sum_x2', kind='property')
+            y_half1 = c.var('tmp_sum_y1', kind='property')
+            y_half2 = c.var('tmp_sum_y2', kind='property')
             c.p_sum(x_sum, (x_half1, x_half2))
             c.p_sum(y_sum, (y_half1, y_half2))
             c.p_sum(x_half1, in_x1)
@@ -144,7 +144,7 @@ def BBP15(d, strong_bij=False):
             for i in range(d)
             ]
     for i in range(d):
-        c.bij(c_var[i][d2+2], p[i][i])
+        c.assign(c_var[i][d2+2], p[i][i])
         for j in range(d2, i+1, -2):
             c.l_sum(t[i][j][0], (r[i][j], p[i][j]))
             c.l_sum(t[i][j][1], (t[i][j][0], p[j][i]))
@@ -161,12 +161,12 @@ def BBP15(d, strong_bij=False):
             if i % 2 == 1:
                 c.l_sum(z[i], (c_var[i][i+1], r2[i]))
             else:
-                c.bij(z[i], c_var[i][i+1])
+                c.assign(z[i], c_var[i][i+1])
         else:
             for j in range(i-1, -1, -1):
                 c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
                 c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.bij(z[i], c_var[i][2])
+            c.assign(z[i], c_var[i][2])
 
     return c
 
@@ -217,7 +217,7 @@ def pini2(d, mat_gen, tmp_sums, strong_bij=False):
     for i in range(d):
         pi = c.var(f'p_{i}_{i}')
         c.l_prod(pi, ref_prods[i][i])
-        c.bij(c_var[i][d2+2], pi)
+        c.assign(c_var[i][d2+2], pi)
         for j in range(d2, i+1, -2):
             c.l_sum(t[i][j][0], (r[i][j], p[i][j][0]))
             c.l_sum(t[i][j][1], (t[i][j][0], p[i][j][1]))
@@ -240,12 +240,12 @@ def pini2(d, mat_gen, tmp_sums, strong_bij=False):
             if i % 2 == 1:
                 c.l_sum(z[i], (c_var[i][i+1], r2[i]))
             else:
-                c.bij(z[i], c_var[i][i+1])
+                c.assign(z[i], c_var[i][i+1])
         else:
             for j in range(i-1, -1, -1):
                 c_var[i][j+2] = c.var(f'c_{i}_{j+2}')
                 c.l_sum(c_var[i][j+2], (c_var[i][j+3], r[j][i]))
-            c.bij(z[i], c_var[i][2])
+            c.assign(z[i], c_var[i][2])
 
     return c
 
@@ -259,7 +259,7 @@ def pini1(d, strong_bij=False):
         for i in range(d)]
     for i in range(d):
         for j in range(i):
-            c.bij(r[j][i], r[i][j])
+            c.assign(r[j][i], r[i][j])
 
     s = [{j: c.var(f's_{i}_{j}') for j in range(d) if j != i}
             for i in range(d)]
@@ -283,10 +283,10 @@ def pini1(d, strong_bij=False):
 
     c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
     for i in range(d):
-        c.bij(c_var[i][0], t[i][0])
+        c.assign(c_var[i][0], t[i][0])
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], t[i][j]))
-        c.bij(z[i], c_var[i][d-1])
+        c.assign(z[i], c_var[i][d-1])
 
     return c
 
@@ -307,7 +307,7 @@ def pini3(d, mat_gen, tmp_sums, strong_bij=False):
         for i in range(d)]
     for i in range(d):
         for j in range(i):
-            c.bij(r[j][i], r[i][j])
+            c.assign(r[j][i], r[i][j])
 
     s = [{j: c.var(f's_{i}_{j}') for j in range(d) if j != i}
             for i in range(d)]
@@ -332,10 +332,10 @@ def pini3(d, mat_gen, tmp_sums, strong_bij=False):
 
     c_var = [[c.var(f'c_{i}_{j}') for j in range(d)] for i in range(d)]
     for i in range(d):
-        c.bij(c_var[i][0], t[i][0])
+        c.assign(c_var[i][0], t[i][0])
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], t[i][j]))
-        c.bij(z[i], c_var[i][d-1])
+        c.assign(z[i], c_var[i][d-1])
 
     return c
 
@@ -353,7 +353,7 @@ def pinic(d, mat_gen, tmp_sums, strong_bij=False):
     if strong_bij:
         for sx, sy in zip(shx2, shy):
             c.bij(sx, sy)
-    x2 = c.var('x')
+    x2 = c.var('x', kind='property')
     c.bij(x2, x)
     refs_gen.bat_ref(c, shx2, shx)
     if tmp_sums:
@@ -383,15 +383,15 @@ def bat_mul_inner(d, mat_gen, tmp_sums, c, sx, sy, sz, x, y, z):
             for i in range(d)]
     for i in range(d):
         for j in range(i+1, d):
-            c.bij(s[i][j], r[i][j])
+            c.assign(s[i][j], r[i][j])
             c.l_sum(t[i][j], (r[i][j], p[i][j]))
             c.l_sum(s[j][i], (t[i][j], p[j][i]))
     for i in range(d):
-        c.bij(s[i][i], p[i][i])
-        c.bij(c_var[i][0], s[i][0])
+        c.assign(s[i][i], p[i][i])
+        c.assign(c_var[i][0], s[i][0])
         for j in range(1, d):
             c.l_sum(c_var[i][j], (c_var[i][j-1], s[i][j]))
-        c.bij(z[i], c_var[i][d-1])
+        c.assign(z[i], c_var[i][d-1])
 
 mat_prod_0 = ft.partial(mat_prod,
         ref=None, var_sums=None, dr=False)
@@ -476,6 +476,6 @@ if __name__ == '__main__':
     #for mul_name, mul_f in []:
         print(f'---- {mul_name}, d={d} ----')
         print(mul_f(d))
-        for _ in range(100):
+        for _ in range(10):
             test_mul(d, mul_f)
 
