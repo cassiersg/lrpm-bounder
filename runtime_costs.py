@@ -96,7 +96,11 @@ def cost_isw_hps_mul(d, raw_costs=raw_costs): return cost_mul(d, 'SNI_H*', raw_c
 
 
 def cost_mul(d, name, raw_costs=raw_costs):
-    return muls_gen.muls[name](d+1).cost(*raw_costs)
+    if name == 'PINI':
+        return min(cost_mul(d, 'PINI1', raw_costs), cost_mul(d, 'PINI2',
+            raw_costs))
+    else:
+        return muls_gen.muls[name](d+1).cost(*raw_costs)
 
 def cost_fake_bat_mul(d, raw_costs=raw_costs):
     return muls_gen.fake_bat_mul(d+1, mat_gen=muls_gen.pini_bat_mat_gen).cost(*raw_costs)

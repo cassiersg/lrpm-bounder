@@ -31,7 +31,16 @@ LABEL_NAME = 1
 LABEL_SHARES = 2
 LABEL_NONE = 3
 
+n_plots = 0
+seen_names = set()
+seen_shares = set()
 def setup_plot():
+    global n_plots
+    global seen_names
+    global seen_shares
+    n_plots = 0
+    seen_names = set()
+    seen_shares = set()
     plt.xlabel('Observation MI (bits)')
     plt.ylabel('Target MI (bits)')
     plt.ylim(max(plt.gca().get_ylim()[0], 10**-28), 10**1.1)
@@ -60,11 +69,8 @@ circ_names_map = {
 def map_circ_name(circuit):
     return circ_names_map.get(circuit, circuit)
 
-n_plots = 0
-seen_names = set()
-seen_shares = set()
 def plot_line(circuit, d=None, color=None, kind='-', label=LABEL_SHARES_NAME,
-        obs_mis=obs_mis):
+        obs_mis=obs_mis, **kwargs):
     global n_plots
     global seen_names
     global seen_shares
@@ -85,21 +91,21 @@ def plot_line(circuit, d=None, color=None, kind='-', label=LABEL_SHARES_NAME,
     if color is None:
         color = colors[n_plots]
     target_mis = obs_mi.compute_target_mis(obs_mis, circuit, d)
-    plt.loglog(obs_mis, target_mis, color + kind, label=label)
+    plt.loglog(obs_mis, target_mis, color + kind, label=label, **kwargs)
     n_plots += 1
 
 
-def to_tikz():
+def to_tikz(name_pattern='../SNI_opt_2/figs/{}.tex'):
     try:
         fname = sys.argv[0].split('.')[0]
-        matplotlib2tikz.save(f'../SNI_opt_2/figs/{fname}.tex',
+        matplotlib2tikz.save(name_pattern.format(fname),
                 figureheight='\\figureheight', figurewidth='\\figurewidth',
                 externalize_tables=True, override_externals=True,
                 tex_relative_path_to_data='figs')
     except Exception as e:
         print('Could not export plot into tikz format', e)
 
-def display():
-    to_tikz()
+def display(name_pattern='../SNI_opt_2/figs/{}.tex'):
+    to_tikz(name_pattern)
     plt.show()
 

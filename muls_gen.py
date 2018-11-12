@@ -19,12 +19,10 @@ import random
 import circuit_model
 import refs_gen
 
-def mul_preamble(d, c, x_name='x', y_name='y', z_name='z', x_kind='input'):
+def mul_preamble(d, c, strong_bij, x_name='x', y_name='y', z_name='z', x_kind='input'):
     x = c.var(x_name, continuous=True, kind='output')
     y = c.var(y_name, kind='output')
     z = c.var(z_name, kind='output')
-    c.bij(x, y)
-    c.bij(x, z)
     sh_x, sh_y, sh_z = [], [], []
     for i in range(d):
         sh_x.append(c.var(f'{x_name}_{i}', kind=x_kind))
@@ -38,6 +36,12 @@ def mul_preamble(d, c, x_name='x', y_name='y', z_name='z', x_kind='input'):
         c.p_sum(x, sh_x)
         c.p_sum(y, sh_y)
         c.p_sum(z, sh_z)
+    if strong_bij:
+        for sx, sy in zip(sh_x, sh_y):
+            c.bij(sx, sy)
+    else:
+        c.bij(x, y)
+    c.bij(x, z)
     return x, y, z, sh_x, sh_y, sh_z
 
 def mat_prod(c, in_x, in_y, ref, var_sums, dr):
@@ -115,10 +119,10 @@ def mat_prod(c, in_x, in_y, ref, var_sums, dr):
         return ([o1+o2 for o1, o2 in zip(m11, m12)] +
                 [o1+o2 for o1, o2 in zip(m21, m22)])
 
-def BBP15(d):
+def BBP15(d, strong_bij=False):
     d2 = d-1
     c = circuit_model.Circuit()
-    _, _, _, x, y, z = mul_preamble(d, c)
+    _, _, _, x, y, z = mul_preamble(d, c, strong_bij)
 
     # product matrix
     p = [[c.var(f'p_{i}_{j}') for j in range(d)] for i in range(d)]
@@ -166,10 +170,10 @@ def BBP15(d):
 
     return c
 
-def pini2(d, mat_gen, tmp_sums):
+def pini2(d, mat_gen, tmp_sums, strong_bij=False):
     d2 = d-1
     c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
+    sx, sy, sz, x, y, z = mul_preamble(d, c, strong_bij)
 
     if tmp_sums:
         var_sums = (sx, sy)
@@ -245,9 +249,9 @@ def pini2(d, mat_gen, tmp_sums):
 
     return c
 
-def pini1(d):
+def pini1(d, strong_bij=False):
     c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
+    sx, sy, sz, x, y, z = mul_preamble(d, c, strong_bij)
 
     # randoms & temps in matrix
     r = [{j: c.var(f'r_{i}_{j}', kind='random' if j < i else 'intermediate')
@@ -286,9 +290,9 @@ def pini1(d):
 
     return c
 
-def pini3(d, mat_gen, tmp_sums):
+def pini3(d, mat_gen, tmp_sums, strong_bij=False):
     c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
+    sx, sy, sz, x, y, z = mul_preamble(d, c, strong_bij)
 
     if tmp_sums:
         var_sums = (sx, sy)
@@ -335,17 +339,20 @@ def pini3(d, mat_gen, tmp_sums):
 
     return c
 
-def bat_mul(d, mat_gen, tmp_sums):
+def bat_mul(d, mat_gen, tmp_sums, strong_bij=False):
     c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
+    sx, sy, sz, x, y, z = mul_preamble(d, c, strong_bij)
     bat_mul_inner(d, mat_gen, tmp_sums, c, sx, sy, sz, x, y, z)
     return c
 
-def pinic(d, mat_gen, tmp_sums):
+def pinic(d, mat_gen, tmp_sums, strong_bij=False):
     c = circuit_model.Circuit()
     x, y, z, shx, shy, shz = mul_preamble(
-            d, c, x_kind='intermediate', x_name='x2')
+            d, c, strong_bij=False, x_kind='intermediate', x_name='x2')
     shx2 = [c.var(f'x_{i}', kind='input') for i in range(d)]
+    if strong_bij:
+        for sx, sy in zip(shx2, shy):
+            c.bij(sx, sy)
     x2 = c.var('x')
     c.bij(x2, x)
     refs_gen.bat_ref(c, shx2, shx)
@@ -386,19 +393,6 @@ def bat_mul_inner(d, mat_gen, tmp_sums, c, sx, sy, sz, x, y, z):
             c.l_sum(c_var[i][j], (c_var[i][j-1], s[i][j]))
         c.bij(z[i], c_var[i][d-1])
 
-def fake_bat_mul(d, mat_gen):
-    c = circuit_model.Circuit()
-    sx, sy, sz, x, y, z = mul_preamble(d, c)
-
-    if tmp_sums:
-        var_sums = (sx, sy)
-    else:
-        var_sums = None
-    # product matrix
-    ref_prods = mat_gen(c, x, y)
-
-    return c
-
 mat_prod_0 = ft.partial(mat_prod,
         ref=None, var_sums=None, dr=False)
 mat_prod_h = ft.partial(mat_prod,
@@ -417,20 +411,25 @@ mat_prod_hpb = ft.partial(mat_prod,
 muls = {
         'bbp15': BBP15,
         'SNI': ft.partial(bat_mul, mat_gen=mat_prod_0, tmp_sums=True),
+        'SNIb': ft.partial(bat_mul, mat_gen=mat_prod_0, tmp_sums=True, strong_bij=True),
         'SNI_H': ft.partial(bat_mul, mat_gen=mat_prod_h, tmp_sums=True),
+        'SNI_Hb': ft.partial(bat_mul, mat_gen=mat_prod_h, tmp_sums=True, strong_bij=True),
         'SNI_H+': ft.partial(bat_mul, mat_gen=mat_prod_hp, tmp_sums=True),
         'SNI_hs': ft.partial(bat_mul, mat_gen=mat_prod_hs, tmp_sums=True),
         'SNI_H*': ft.partial(bat_mul, mat_gen=mat_prod_hps, tmp_sums=True),
+        'SNI_H*b': ft.partial(bat_mul, mat_gen=mat_prod_hps, tmp_sums=True, strong_bij=True),
         #'SNI_hpe': ft.partial(bat_mul, mat_gen=mat_prod_hpe, tmp_sums=True),
         #'SNI_hpb': ft.partial(bat_mul, mat_gen=mat_prod_hpb, tmp_sums=True),
         'SNI_ht': ft.partial(bat_mul, mat_gen=mat_prod_h, tmp_sums=False),
         'SNI_H+ naive': ft.partial(bat_mul, mat_gen=mat_prod_hp, tmp_sums=False),
         'PINI1': pini1,
+        'PINI1b': ft.partial(pini1, strong_bij=True),
         'PINI3': ft.partial(pini3, mat_gen=mat_prod_0, tmp_sums=True),
         'PINI3_H': ft.partial(pini3, mat_gen=mat_prod_h, tmp_sums=True),
         'PINI3_H+': ft.partial(pini3, mat_gen=mat_prod_hp, tmp_sums=True),
         #'PINI3_hs': ft.partial(pini3, mat_gen=mat_prod_hs, tmp_sums=True),
         'PINI3_H*': ft.partial(pini3, mat_gen=mat_prod_hps, tmp_sums=True),
+        'PINI3_H*b': ft.partial(pini3, mat_gen=mat_prod_hps, tmp_sums=True, strong_bij=True),
         #'PINI3_hpe': ft.partial(pini3, mat_gen=mat_prod_hpe, tmp_sums=True),
         'PINI3_H+ naive': ft.partial(pini3, mat_gen=mat_prod_hp, tmp_sums=False),
         'PINI2': ft.partial(pini2, mat_gen=mat_prod_0, tmp_sums=True),
@@ -442,6 +441,7 @@ muls = {
         'GreedyMult_H': ft.partial(pinic, mat_gen=mat_prod_h, tmp_sums=True),
         'GreedyMult_H+': ft.partial(pinic, mat_gen=mat_prod_hp, tmp_sums=True),
         'GreedyMult_H*': ft.partial(pinic, mat_gen=mat_prod_hps, tmp_sums=True),
+        'GreedyMult_H*b': ft.partial(pinic, mat_gen=mat_prod_hps, tmp_sums=True, strong_bij=True),
         }
 
 import sys
