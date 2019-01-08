@@ -14,7 +14,10 @@
 
 import numpy as np
 from matplotlib import pyplot as plt
-import matplotlib2tikz
+try:
+    import matplotlib2tikz
+except ModuleNotFoundError:
+    pass
 import sys
 
 import muls_gen
